@@ -115,15 +115,7 @@ class Extension {
             GLib.PRIORITY_DEFAULT,
             5,                               // seconds to wait
             () => {
-                const todaysEvents = DateHelperFunctions.getTodaysEvents(this._indicator._calendarSource);
-                const nextEvent = DateHelperFunctions.getNextEvent(todaysEvents);
-
-                if (nextEvent != null) {
-                    this._indicator.displayEvent(nextEvent);
-                }
-                else {
-                    this._indicator.displayNoEvents();
-                }
+                this.refreshIndicator();
 
                 return GLib.SOURCE_CONTINUE;
             }
@@ -133,6 +125,20 @@ class Extension {
     _stopLoop() {
         GLib.Source.remove(this.sourceId);
     }
+
+
+    refreshIndicator() {
+                const todaysEvents = DateHelperFunctions.getTodaysEvents(this._indicator._calendarSource);
+                const nextEvent = DateHelperFunctions.getNextEvent(todaysEvents);
+
+                if (nextEvent != null) {
+                    this._indicator.displayEvent(nextEvent);
+                }
+                else {
+                    this._indicator.displayNoEvents();
+                }
+    }
+
 
     disable() {
         Main.panel._centerBox.remove_child(this._indicator.container);
