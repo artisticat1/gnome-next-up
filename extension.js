@@ -20,7 +20,7 @@
 
 const GETTEXT_DOMAIN = 'my-indicator-extension';
 
-const { GObject, St, Clutter } = imports.gi;
+const { GObject, St, Clutter, GLib } = imports.gi;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Main = imports.ui.main;
@@ -29,10 +29,16 @@ const PopupMenu = imports.ui.popupMenu;
 
 const _ = ExtensionUtils.gettext;
 
+
+const Calendar = imports.ui.calendar;
+
+
 const Indicator = GObject.registerClass(
 class Indicator extends PanelMenu.Button {
     _init() {
         super._init(0.0, _('My Shiny Indicator'));
+        
+        this._calendarSource = new Calendar.DBusEventSource();
         
         
         this._menuLayout = new St.BoxLayout({
@@ -75,6 +81,31 @@ class Indicator extends PanelMenu.Button {
         });
         this.menu.addMenuItem(item);
     }
+
+
+
+    checkCalendarEvents() {
+
+        const src = this._calendarSource;
+        src._loadEvents(true);
+
+        const today = new Date();
+        const next10Days = new Date();
+
+        today.setHours(0); // get event from today at midnight
+        next10Days.setDate(today.getDate() + 10);
+        const events = src.getEvents(today, next10Days);
+
+        events.forEach(event => {
+            log("Event ID:", event.id);
+            log("Summary:", event.summary);
+            log("Starting at", event.date);
+            log("Ending at", event.end);
+            log("");
+        });
+
+    }
+
 });
 
 class Extension {
@@ -87,11 +118,25 @@ class Extension {
     enable() {
         this._indicator = new Indicator();
         Main.panel.addToStatusArea(this._uuid, this._indicator);
+
+
+        this.sourceId = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            1,                               // seconds to wait
+            () => {
+                this._indicator.checkCalendarEvents();
+                return GLib.SOURCE_CONTINUE;
+            }
+        );
+
+        
     }
 
     disable() {
         this._indicator.destroy();
         this._indicator = null;
+
+        GLib.Source.remove(this.sourceId);
     }
 }
 
