@@ -32,17 +32,20 @@ const _ = ExtensionUtils.gettext;
 
 const Calendar = imports.ui.calendar;
 
+const Me = ExtensionUtils.getCurrentExtension();
+const DateHelperFunctions = Me.imports.dateHelperFunctions;
+
 
 const Indicator = GObject.registerClass(
 class Indicator extends PanelMenu.Button {
     _init() {
         super._init(0.0, _('Next Up Indicator'));
-        
+
         this._calendarSource = new Calendar.DBusEventSource();
         
         this._loadGUI();
     }
-        
+
 
 
     _loadGUI() {
@@ -55,12 +58,12 @@ class Indicator extends PanelMenu.Button {
             x_expand: true,
             pack_start: false
         });
-
+        
         const icon = new St.Icon({
             icon_name: 'alarm-symbolic',
             style_class: 'system-status-icon'
         });
-        const text = new St.Label({
+        this.text = new St.Label({
             text: "In 25 min: Quantum Field Theory at 11:00",
             style_class: "system-status-text",
             y_expand: true,
@@ -69,32 +72,25 @@ class Indicator extends PanelMenu.Button {
 
 
         this._menuLayout.add_actor(icon);
-        this._menuLayout.add_actor(text);
+        this._menuLayout.add_actor(this.text);
         this.add_actor(this._menuLayout);
 
         return;
     }
 
 
+    displayEvent(event) {
+        const eventDate = event.date;
+        const time = eventDate.getHours() + ":" + eventDate.getMinutes();
 
-    getTodaysEvents() {
-
-        const src = this._calendarSource;
-        src._loadEvents(true);
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Get event from today at midnight
-
-        const tomorrow = new Date(today);
-        tomorrow.setDate(today.getDate() + 1);
-
-        const todaysEvents = src.getEvents(today, tomorrow);
-
-        return todaysEvents;
+        this.text.set_text("Next up: " + event.summary + " at " + time);
+    }
+    
+    displayNoEvents() {
+        this.text.set_text("Done for today!");
     }
 
-
-        });
+});
 
 
 
@@ -118,12 +114,21 @@ class Extension {
             GLib.PRIORITY_DEFAULT,
             5,                               // seconds to wait
             () => {
-                this._indicator.checkCalendarEvents();
+                const todaysEvents = DateHelperFunctions.getTodaysEvents(this._indicator._calendarSource);
+                const nextEvent = DateHelperFunctions.getNextEvent(todaysEvents);
+
+                if (nextEvent != null) {
+                    this._indicator.displayEvent(nextEvent);
+                }
+                else {
+                    this._indicator.displayNoEvents();
+                }
+
                 return GLib.SOURCE_CONTINUE;
             }
         );
     }
-        
+
     _stopLoop() {
         GLib.Source.remove(this.sourceId);
     }
