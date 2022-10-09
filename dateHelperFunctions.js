@@ -30,8 +30,95 @@ function getNextEvent(todaysEvents) {
 }
 
 
-function getTimeOfEventAsText(event) {
-    const eventDate = event.date;
+function getNextEventsToDisplay(todaysEvents) {
+    const now = new Date();
+    const N = todaysEvents.length;
+
+    let currentEvent = null; // The calendar event the user is currently in
+    let nextEvent = null; // The next calendar event coming up
+
+    for (let i = 0; i < N; i++) {
+        const event = todaysEvents[i];
+        const eventStart = event.date;
+        const eventEnd = event.end;
+
+        if (now < eventStart) {
+            
+            nextEvent = event;
+            break;
+        }
+        else if (now < eventEnd) {
+
+            currentEvent = event;
+
+            // Check whether there's an event after this one
+            if (i < N - 1) {
+                nextEvent = todaysEvents[i+1];
+            }
+
+            break;
+        }
+    }
+
+    
+    return {
+            currentEvent: currentEvent,
+            nextEvent: nextEvent
+        };
+}
+
+
+
+function eventStatusToIndicatorText(eventStatus) {
+    
+    function displayNextEvent(event) {
+        const timeText = getTimeOfEventAsText(event.date);
+        const diffText = getTimeToEventAsText(event.date);
+        
+        return `In ${diffText}: ${event.summary} at ${timeText}`;
+    }
+
+    function displayCurrentEventAndNextEvent(currentEvent, nextEvent) {
+        const endsInText = getTimeToEventAsText(currentEvent.end);
+        const timeText = getTimeOfEventAsText(nextEvent.date);
+        
+        return `Ends in ${endsInText}. Next: ${nextEvent.summary} at ${timeText}`;
+    }
+
+    function displayCurrentEvent(event) {
+        const endsInText = getTimeToEventAsText(event.end);
+        
+        return `${event.summary}: Ends in ${endsInText}`;
+    }
+
+    function displayNoEvents() {
+        return "Done for today!";
+    }
+
+
+    const { currentEvent, nextEvent } = eventStatus;
+
+    if (currentEvent != null) {
+        if (nextEvent != null) {
+            return displayCurrentEventAndNextEvent(currentEvent, nextEvent);
+        }
+        else {
+            return displayCurrentEvent(currentEvent);
+        }
+    }
+    else {
+        if (nextEvent != null) {
+            return displayNextEvent(nextEvent);
+        }
+        else {
+            return displayNoEvents();
+        }
+    }
+}
+
+
+
+function getTimeOfEventAsText(eventDate) {
     const hrs = eventDate.getHours();
     let mins = eventDate.getMinutes().toString();
 
@@ -42,8 +129,7 @@ function getTimeOfEventAsText(event) {
 }
 
 
-function getTimeToEventAsText(event) {
-    const eventDate = event.date;
+function getTimeToEventAsText(eventDate) {
 
     const now = new Date();
     const diff = Math.abs(eventDate - now);

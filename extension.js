@@ -23,14 +23,13 @@ const GETTEXT_DOMAIN = 'my-indicator-extension';
 const { GObject, St, Clutter, GLib } = imports.gi;
 
 const ExtensionUtils = imports.misc.extensionUtils;
+const Calendar = imports.ui.calendar;
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 
 const _ = ExtensionUtils.gettext;
 
-
-const Calendar = imports.ui.calendar;
 
 const Me = ExtensionUtils.getCurrentExtension();
 const DateHelperFunctions = Me.imports.dateHelperFunctions;
@@ -79,17 +78,9 @@ class Indicator extends PanelMenu.Button {
     }
 
 
-    displayEvent(event) {
-        const timeText = DateHelperFunctions.getTimeOfEventAsText(event);
-        const diffText = DateHelperFunctions.getTimeToEventAsText(event);
-
-        this.text.set_text(`In ${diffText}: ${event.summary} at ${timeText}`);
+    setText(text) {
+        this.text.set_text(text);
     }
-    
-    displayNoEvents() {
-        this.text.set_text("Done for today!");
-    }
-
 });
 
 
@@ -128,15 +119,11 @@ class Extension {
 
 
     refreshIndicator() {
-                const todaysEvents = DateHelperFunctions.getTodaysEvents(this._indicator._calendarSource);
-                const nextEvent = DateHelperFunctions.getNextEvent(todaysEvents);
+        const todaysEvents = DateHelperFunctions.getTodaysEvents(this._indicator._calendarSource);
+        const eventStatus = DateHelperFunctions.getNextEventsToDisplay(todaysEvents);
+        const text = DateHelperFunctions.eventStatusToIndicatorText(eventStatus);
 
-                if (nextEvent != null) {
-                    this._indicator.displayEvent(nextEvent);
-                }
-                else {
-                    this._indicator.displayNoEvents();
-                }
+        this._indicator.setText(text);
     }
 
 
