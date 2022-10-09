@@ -90,14 +90,21 @@ class Indicator extends PanelMenu.Button {
         src._loadEvents(true);
 
         const today = new Date();
-        const next10Days = new Date();
+        const tomorrow = new Date();
 
-        today.setHours(0); // get event from today at midnight
-        next10Days.setDate(today.getDate() + 10);
-        const events = src.getEvents(today, next10Days);
+        today.setHours(0); // Get event from today at midnight
+        tomorrow.setHours(0);
+        today.setMinutes(0);
+        tomorrow.setMinutes(0);
 
-        events.forEach(event => {
-            log("Event ID:", event.id);
+        tomorrow.setDate(today.getDate() + 1);
+
+        const todaysEvents = src.getEvents(today, tomorrow);
+
+        log("Today's events:");
+        log("Events between", today, "and", tomorrow);
+
+        todaysEvents.forEach(event => {
             log("Summary:", event.summary);
             log("Starting at", event.date);
             log("Ending at", event.end);
@@ -122,7 +129,7 @@ class Extension {
 
         this.sourceId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
-            1,                               // seconds to wait
+            5,                               // seconds to wait
             () => {
                 this._indicator.checkCalendarEvents();
                 return GLib.SOURCE_CONTINUE;
