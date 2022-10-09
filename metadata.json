@@ -1,0 +1,8 @@
+{
+  "name": "Next Up",
+  "description": "Show your next calendar event in the status bar",
+  "uuid": "next-up@artisticat1.github.com",
+  "shell-version": [
+    "42"
+  ]
+}
