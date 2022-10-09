@@ -64,7 +64,7 @@ class Indicator extends PanelMenu.Button {
             style_class: 'system-status-icon'
         });
         this.text = new St.Label({
-            text: "In 25 min: Quantum Field Theory at 11:00",
+            text: "Loading",
             style_class: "system-status-text",
             y_expand: true,
             y_align: Clutter.ActorAlign.CENTER
@@ -80,10 +80,10 @@ class Indicator extends PanelMenu.Button {
 
 
     displayEvent(event) {
-        const eventDate = event.date;
-        const time = eventDate.getHours() + ":" + eventDate.getMinutes();
+        const timeText = DateHelperFunctions.getTimeOfEventAsText(event);
+        const diffText = DateHelperFunctions.getTimeToEventAsText(event);
 
-        this.text.set_text("Next up: " + event.summary + " at " + time);
+        this.text.set_text(`In ${diffText}: ${event.summary} at ${timeText}`);
     }
     
     displayNoEvents() {

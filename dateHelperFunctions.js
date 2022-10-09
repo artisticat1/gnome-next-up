@@ -28,3 +28,33 @@ function getNextEvent(todaysEvents) {
 
     return null;
 }
+
+
+function getTimeOfEventAsText(event) {
+    const eventDate = event.date;
+    const time = eventDate.getHours() + ":" + eventDate.getMinutes();
+
+    return time;
+}
+
+
+function getTimeToEventAsText(event) {
+    const eventDate = event.date;
+
+    const now = new Date();
+    const diff = Math.abs(eventDate - now);
+    const diffInMins = diff / (1000*60);
+
+    const hrDiff = Math.floor(diffInMins / 60);
+    const minDiff = Math.floor(diffInMins % 60);
+
+    let diffText;
+    if (hrDiff === 0) {
+        diffText = minDiff + " min";
+    }
+    else {
+        diffText = hrDiff + " hr " + minDiff + " min";
+    }
+
+    return diffText;
+}
