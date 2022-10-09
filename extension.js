@@ -36,11 +36,16 @@ const Calendar = imports.ui.calendar;
 const Indicator = GObject.registerClass(
 class Indicator extends PanelMenu.Button {
     _init() {
-        super._init(0.0, _('My Shiny Indicator'));
+        super._init(0.0, _('Next Up Indicator'));
         
         this._calendarSource = new Calendar.DBusEventSource();
         
+        this._loadGUI();
+    }
         
+
+
+    _loadGUI() {
         this._menuLayout = new St.BoxLayout({
             vertical: false,
             clip_to_allocation: true,
@@ -51,69 +56,47 @@ class Indicator extends PanelMenu.Button {
             pack_start: false
         });
 
-        
         const icon = new St.Icon({
             icon_name: 'alarm-symbolic',
             style_class: 'system-status-icon'
         });
         const text = new St.Label({
-            text: "Hello world!",
+            text: "In 25 min: Quantum Field Theory at 11:00",
             style_class: "system-status-text",
             y_expand: true,
             y_align: Clutter.ActorAlign.CENTER
         });
 
+
         this._menuLayout.add_actor(icon);
         this._menuLayout.add_actor(text);
-
-
-
         this.add_actor(this._menuLayout);
 
-
-
-
-        
-
-        let item = new PopupMenu.PopupMenuItem(_('Show Notification'));
-        item.connect('activate', () => {
-            Main.notify(_('Whatʼs up, folks?'));
-        });
-        this.menu.addMenuItem(item);
+        return;
     }
 
 
 
-    checkCalendarEvents() {
+    getTodaysEvents() {
 
         const src = this._calendarSource;
         src._loadEvents(true);
 
         const today = new Date();
-        const tomorrow = new Date();
+        today.setHours(0, 0, 0, 0); // Get event from today at midnight
 
-        today.setHours(0); // Get event from today at midnight
-        tomorrow.setHours(0);
-        today.setMinutes(0);
-        tomorrow.setMinutes(0);
-
+        const tomorrow = new Date(today);
         tomorrow.setDate(today.getDate() + 1);
 
         const todaysEvents = src.getEvents(today, tomorrow);
 
-        log("Today's events:");
-        log("Events between", today, "and", tomorrow);
-
-        todaysEvents.forEach(event => {
-            log("Summary:", event.summary);
-            log("Starting at", event.date);
-            log("Ending at", event.end);
-            log("");
-        });
-
+        return todaysEvents;
     }
 
-});
+
+        });
+
+
 
 class Extension {
     constructor(uuid) {
@@ -127,6 +110,10 @@ class Extension {
         Main.panel.addToStatusArea(this._uuid, this._indicator);
 
 
+        this._startLoop();        
+    }
+
+    _startLoop() {
         this.sourceId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             5,                               // seconds to wait
@@ -135,17 +122,21 @@ class Extension {
                 return GLib.SOURCE_CONTINUE;
             }
         );
-
+    }
         
+    _stopLoop() {
+        GLib.Source.remove(this.sourceId);
     }
 
     disable() {
         this._indicator.destroy();
         this._indicator = null;
 
-        GLib.Source.remove(this.sourceId);
+        this._stopLoop();
     }
 }
+
+
 
 function init(meta) {
     return new Extension(meta.uuid);
