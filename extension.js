@@ -103,7 +103,8 @@ class Extension {
 
     enable() {
         this._indicator = new Indicator();
-        Main.panel.addToStatusArea(this._uuid, this._indicator);
+        
+        Main.panel._centerBox.insert_child_at_index(this._indicator.container, 0);
 
 
         this._startLoop();        
@@ -134,6 +135,8 @@ class Extension {
     }
 
     disable() {
+        Main.panel._centerBox.remove_child(this._indicator.container);
+
         this._indicator.destroy();
         this._indicator = null;
 
