@@ -7,6 +7,6 @@ Tested on GNOME 42.4.
 
 
 ## References
-https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/calendar.js
-https://extensions.gnome.org/extension/4448/next-meeting/
-https://github.com/corecoding/Vitals
+- https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/calendar.js
+- https://extensions.gnome.org/extension/4448/next-meeting/
+- https://github.com/corecoding/Vitals
