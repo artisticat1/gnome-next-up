@@ -32,8 +32,12 @@ function getNextEvent(todaysEvents) {
 
 function getTimeOfEventAsText(event) {
     const eventDate = event.date;
-    const time = eventDate.getHours() + ":" + eventDate.getMinutes();
+    const hrs = eventDate.getHours();
+    let mins = eventDate.getMinutes().toString();
 
+    mins = mins.padEnd(2, "0"); // Show e.g. 11am as 11:00 instead of 11:0
+
+    const time = `${hrs}:${mins}`;
     return time;
 }
 
