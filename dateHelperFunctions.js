@@ -100,14 +100,14 @@ function eventStatusToIndicatorText(eventStatus) {
 
         const summary = trimLongEventName(nextEvent.summary);
         
-        
+
         return `Ends in ${endsInText}. Next: ${summary} at ${timeText}`;
     }
 
     function displayCurrentEvent(event) {
         const endsInText = getTimeToEventAsText(event.end);
         
-        return `${event.summary}: Ends in ${endsInText}`;
+        return `Ends in ${endsInText}: ${event.summary}`;
     }
 
     function displayNoEvents() {
