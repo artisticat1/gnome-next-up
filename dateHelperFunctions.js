@@ -1,3 +1,16 @@
+const MAX_EVENT_SUMMARY_LENGTH = 35;
+
+
+function trimLongEventName(summary) {
+    if (summary.length > MAX_EVENT_SUMMARY_LENGTH) {
+        return summary.substring(0, MAX_EVENT_SUMMARY_LENGTH) + "...";
+    }
+    else {
+        return summary;
+    }
+}
+
+
 function getTodaysEvents(calendarSource) {
 
     const src = calendarSource;
@@ -74,15 +87,21 @@ function eventStatusToIndicatorText(eventStatus) {
     function displayNextEvent(event) {
         const timeText = getTimeOfEventAsText(event.date);
         const diffText = getTimeToEventAsText(event.date);
+
+        const summary = trimLongEventName(event.summary);
         
-        return `In ${diffText}: ${event.summary} at ${timeText}`;
+        
+        return `In ${diffText}: ${summary} at ${timeText}`;
     }
 
     function displayCurrentEventAndNextEvent(currentEvent, nextEvent) {
         const endsInText = getTimeToEventAsText(currentEvent.end);
         const timeText = getTimeOfEventAsText(nextEvent.date);
+
+        const summary = trimLongEventName(nextEvent.summary);
         
-        return `Ends in ${endsInText}. Next: ${nextEvent.summary} at ${timeText}`;
+        
+        return `Ends in ${endsInText}. Next: ${summary} at ${timeText}`;
     }
 
     function displayCurrentEvent(event) {
