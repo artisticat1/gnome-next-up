@@ -24,6 +24,7 @@ const { GObject, St, Clutter, GLib } = imports.gi;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Calendar = imports.ui.calendar;
+const Gio = imports.gi.Gio;
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
@@ -57,20 +58,25 @@ class Indicator extends PanelMenu.Button {
             x_expand: true,
             pack_start: false
         });
-        
-        const icon = new St.Icon({
+
+
+        this._confettiGicon = Gio.icon_new_for_string(Me.path + "/assets/party-popper.png");
+        this._alarmIcon = new St.Icon({
             icon_name: 'alarm-symbolic',
             style_class: 'system-status-icon'
         });
+
+        this.icon = this._alarmIcon;
+        
+        
         this.text = new St.Label({
             text: "Loading",
-            style_class: "system-status-text",
             y_expand: true,
             y_align: Clutter.ActorAlign.CENTER
         });
 
 
-        this._menuLayout.add_actor(icon);
+        this._menuLayout.add_actor(this.icon);
         this._menuLayout.add_actor(this.text);
         this.add_actor(this._menuLayout);
 
@@ -80,6 +86,16 @@ class Indicator extends PanelMenu.Button {
 
     setText(text) {
         this.text.set_text(text);
+    }
+
+    
+    showAlarmIcon() {
+        this.icon.set_icon_name("alarm-symbolic");
+    }
+
+
+    showConfettiIcon() {
+        this.icon.set_gicon(this._confettiGicon);
     }
 });
 
@@ -122,6 +138,15 @@ class Extension {
         const todaysEvents = DateHelperFunctions.getTodaysEvents(this._indicator._calendarSource);
         const eventStatus = DateHelperFunctions.getNextEventsToDisplay(todaysEvents);
         const text = DateHelperFunctions.eventStatusToIndicatorText(eventStatus);
+
+
+        if ((eventStatus.currentEvent === null) && (eventStatus.nextEvent === null)) {
+            this._indicator.showConfettiIcon();
+        }
+        else {
+            this._indicator.showAlarmIcon();
+        }
+
 
         this._indicator.setText(text);
     }

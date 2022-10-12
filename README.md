@@ -10,3 +10,5 @@ Tested on GNOME 42.4.
 - https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/calendar.js
 - https://extensions.gnome.org/extension/4448/next-meeting/
 - https://github.com/corecoding/Vitals
+
+- [Party popper icon](https://www.flaticon.com/free-icon/party-popper_6335608) by [Ayub Irawan](https://www.flaticon.com/authors/ayub-irawan)
