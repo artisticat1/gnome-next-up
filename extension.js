@@ -18,7 +18,7 @@
 
 /* exported init */
 
-const GETTEXT_DOMAIN = 'my-indicator-extension';
+const GETTEXT_DOMAIN = "next-up-indicator-extension";
 
 const { GObject, St, Clutter, GLib } = imports.gi;
 
