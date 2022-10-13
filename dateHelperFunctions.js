@@ -155,7 +155,7 @@ function getTimeToEventAsText(eventDate) {
     const diffInMins = diff / (1000*60);
 
     const hrDiff = Math.floor(diffInMins / 60);
-    const minDiff = Math.floor(diffInMins % 60);
+    const minDiff = Math.ceil(diffInMins % 60);
 
     let diffText;
     if (hrDiff === 0) {
