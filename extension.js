@@ -104,41 +104,62 @@ class Indicator extends PanelMenu.Button {
 class Extension {
     constructor(uuid) {
         this._uuid = uuid;
-
+        
         ExtensionUtils.initTranslations(GETTEXT_DOMAIN);
     }
-
+    
     enable() {
         this._indicator = new Indicator();
+
+        this._settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.example');
+        this._settingChangedSignal = this._settings.connect("changed::which-panel", () => {
+            this.unloadIndicator();
+            this.loadIndicator(this._settings.get_int("which-panel"));
+        })
         
-        Main.panel._centerBox.insert_child_at_index(this._indicator.container, 0);
-
-
+        this.loadIndicator(this._settings.get_int("which-panel"));
         this._startLoop();        
     }
-
+    
     _startLoop() {
         this.sourceId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             5,                               // seconds to wait
             () => {
                 this.refreshIndicator();
-
+                
                 return GLib.SOURCE_CONTINUE;
             }
-        );
-    }
-
-    _stopLoop() {
+            );
+        }
+        
+        _stopLoop() {
         GLib.Source.remove(this.sourceId);
     }
 
+    
+    unloadIndicator() {
+        this._indicator.container.get_parent().remove_actor(this._indicator.container);
+    }
+    
+    
+    loadIndicator(whichPanel) {
 
+        const boxes = [
+            Main.panel._leftBox,
+            Main.panel._centerBox,
+            Main.panel._rightBox
+        ];
+
+        boxes[whichPanel].insert_child_at_index(this._indicator.container, 0);
+    }
+
+    
     refreshIndicator() {
         const todaysEvents = DateHelperFunctions.getTodaysEvents(this._indicator._calendarSource);
         const eventStatus = DateHelperFunctions.getNextEventsToDisplay(todaysEvents);
         const text = DateHelperFunctions.eventStatusToIndicatorText(eventStatus);
-
+        
 
         if ((eventStatus.currentEvent === null) && (eventStatus.nextEvent === null)) {
             this._indicator.showConfettiIcon();
@@ -155,9 +176,13 @@ class Extension {
     disable() {
         Main.panel._centerBox.remove_child(this._indicator.container);
 
+
+        this._settings.disconnect(this._settingChangedSignal);
+
+
         this._indicator.destroy();
         this._indicator = null;
-
+        
         this._stopLoop();
     }
 }
