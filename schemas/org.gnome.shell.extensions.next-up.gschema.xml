@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.gnome.shell.extensions.example" path="/org/gnome/shell/extensions/example/">
+  <schema id="org.gnome.shell.extensions.next-up" path="/org/gnome/shell/extensions/next-up/">
     <!-- See also: https://docs.gtk.org/glib/gvariant-format-strings.html -->
     <key name="which-panel" type="i">
       <default>1</default>

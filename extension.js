@@ -111,7 +111,7 @@ class Extension {
     enable() {
         this._indicator = new Indicator();
 
-        this._settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.example');
+        this._settings = ExtensionUtils.getSettings("org.gnome.shell.extensions.next-up");
         this._settingChangedSignal = this._settings.connect("changed::which-panel", () => {
             this.unloadIndicator();
             this.loadIndicator(this._settings.get_int("which-panel"));
