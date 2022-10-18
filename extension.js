@@ -44,6 +44,7 @@ class Indicator extends PanelMenu.Button {
         this._calendarSource = new Calendar.DBusEventSource();
         
         this._loadGUI();
+        this._initialiseMenu();
     }
 
 
@@ -81,6 +82,15 @@ class Indicator extends PanelMenu.Button {
         this.add_actor(this._menuLayout);
 
         return;
+    }
+
+
+    _initialiseMenu() {
+        const settingsItem = new PopupMenu.PopupMenuItem(_('Settings'));
+        settingsItem.connect('activate', () => {
+            ExtensionUtils.openPrefs();
+        });
+        this.menu.addMenuItem(settingsItem);
     }
 
 
@@ -138,11 +148,6 @@ class Extension {
     }
 
     
-    unloadIndicator() {
-        this._indicator.container.get_parent().remove_actor(this._indicator.container);
-    }
-    
-    
     loadIndicator(whichPanel) {
 
         const boxes = [
@@ -152,6 +157,11 @@ class Extension {
         ];
 
         boxes[whichPanel].insert_child_at_index(this._indicator.container, 0);
+    }
+
+
+    unloadIndicator() {
+        this._indicator.container.get_parent().remove_actor(this._indicator.container);
     }
 
     
