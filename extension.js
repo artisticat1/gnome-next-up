@@ -107,6 +107,31 @@ class Indicator extends PanelMenu.Button {
     showConfettiIcon() {
         this.icon.set_gicon(this._confettiGicon);
     }
+
+
+    vfunc_event(event) {
+        
+        if ((event.type() == Clutter.EventType.TOUCH_END || event.type() == Clutter.EventType.BUTTON_RELEASE)) {
+            
+            if (event.get_button() === Clutter.BUTTON_PRIMARY) {
+
+                // Show calendar on left click
+                if (this.menu.isOpen) {
+                    this.menu._getTopMenu().close();
+                }
+                else {
+                    Main.panel.toggleCalendar();
+                }
+
+            }
+            else {
+                // Show settings menu on right click
+                this.menu.toggle();
+            }
+        }
+        
+        return Clutter.EVENT_PROPAGATE;
+    }
 });
 
 
@@ -128,7 +153,7 @@ class Extension {
         })
         
         this.loadIndicator(this._settings.get_int("which-panel"));
-        this._startLoop();        
+        this._startLoop();
     }
     
     _startLoop() {
