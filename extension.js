@@ -149,11 +149,19 @@ class Extension {
         this._settings = ExtensionUtils.getSettings("org.gnome.shell.extensions.next-up");
         this._settingChangedSignal = this._settings.connect("changed::which-panel", () => {
             this.unloadIndicator();
-            this.loadIndicator(this._settings.get_int("which-panel"));
-        })
+            this.loadIndicator();
+        });
         
-        this.loadIndicator(this._settings.get_int("which-panel"));
-        this._startLoop();
+
+        // Wait 3 seconds before loading the indicator
+        // So that it isn't loaded too early and positioned after other elements in the panel
+        GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 3, () => {
+            this.loadIndicator();
+            this._startLoop();
+            
+            return false;
+        });
+
     }
     
     _startLoop() {
@@ -167,19 +175,21 @@ class Extension {
             }
             );
         }
-        
+
         _stopLoop() {
         GLib.Source.remove(this.sourceId);
     }
 
     
-    loadIndicator(whichPanel) {
+    loadIndicator() {
 
         const boxes = [
             Main.panel._leftBox,
             Main.panel._centerBox,
             Main.panel._rightBox
         ];
+
+        const whichPanel = this._settings.get_int("which-panel");
 
         boxes[whichPanel].insert_child_at_index(this._indicator.container, 0);
     }
