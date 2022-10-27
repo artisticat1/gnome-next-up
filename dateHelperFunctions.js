@@ -28,29 +28,17 @@ function getTodaysEvents(calendarSource) {
 }
 
 
-function getNextEvent(todaysEvents) {
-    const now = new Date();
-
-    for (const event of todaysEvents) {
-        const eventDate = event.date;
-
-        if (now < eventDate) {
-            return event;
-        }
-    }
-
-    return null;
-}
-
-
 function getNextEventsToDisplay(todaysEvents) {
     const now = new Date();
     const N = todaysEvents.length;
 
     let currentEvent = null; // The calendar event the user is currently in
     let nextEvent = null; // The next calendar event coming up
+    let done = false;
 
     for (let i = 0; i < N; i++) {
+        if (done) break;
+
         const event = todaysEvents[i];
         const eventStart = event.date;
         const eventEnd = event.end;
@@ -66,10 +54,24 @@ function getNextEventsToDisplay(todaysEvents) {
 
             // Check whether there's an event after this one
             if (i < N - 1) {
-                nextEvent = todaysEvents[i+1];
-            }
 
-            break;
+                let someNextEvent;
+
+                for (let j = i+1; j < N; j++) {
+
+                    someNextEvent = todaysEvents[j];
+
+                    // Check whether the next event overlaps the current event
+                    // or whether they start at the same time
+    
+                    if (!(someNextEvent.date.valueOf() === currentEvent.date.valueOf())) {
+                        nextEvent = someNextEvent;
+                        done = true;
+                        break;
+                    }
+                }
+                    
+            }
         }
     }
 
