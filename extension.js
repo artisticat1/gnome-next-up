@@ -155,7 +155,7 @@ class Extension {
 
         // Wait 3 seconds before loading the indicator
         // So that it isn't loaded too early and positioned after other elements in the panel
-        GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 3, () => {
+        this.delaySourceId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 3, () => {
             this.loadIndicator();
             this._startLoop();
 
@@ -174,10 +174,6 @@ class Extension {
                 return GLib.SOURCE_CONTINUE;
             }
         );
-    }
-
-    _stopLoop() {
-        GLib.Source.remove(this.sourceId);
     }
 
 
@@ -228,7 +224,17 @@ class Extension {
         this._indicator.destroy();
         this._indicator = null;
 
-        this._stopLoop();
+
+
+        if (this.sourceId) {
+            GLib.Source.remove(this.sourceId);
+            this.sourceId = null;
+        }
+
+        if (this.delaySourceId) {
+            GLib.Source.remove(this.delaySourceId);
+            this.delaySourceId = null;
+        }
     }
 }
 
