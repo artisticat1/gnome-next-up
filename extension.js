@@ -37,112 +37,112 @@ const DateHelperFunctions = Me.imports.dateHelperFunctions;
 
 
 const Indicator = GObject.registerClass(
-class Indicator extends PanelMenu.Button {
-    _init() {
-        super._init(0.0, _('Next Up Indicator'));
+    class Indicator extends PanelMenu.Button {
+        _init() {
+            super._init(0.0, _('Next Up Indicator'));
 
-        this._calendarSource = new Calendar.DBusEventSource();
-        
-        this._loadGUI();
-        this._initialiseMenu();
-    }
+            this._calendarSource = new Calendar.DBusEventSource();
 
-
-
-    _loadGUI() {
-        this._menuLayout = new St.BoxLayout({
-            vertical: false,
-            clip_to_allocation: true,
-            x_align: Clutter.ActorAlign.START,
-            y_align: Clutter.ActorAlign.CENTER,
-            reactive: true,
-            x_expand: true,
-            pack_start: false
-        });
+            this._loadGUI();
+            this._initialiseMenu();
+        }
 
 
-        this._confettiGicon = Gio.icon_new_for_string(Me.path + "/assets/party-popper.png");
-        this._alarmIcon = new St.Icon({
-            icon_name: 'alarm-symbolic',
-            style_class: 'system-status-icon'
-        });
 
-        this.icon = this._alarmIcon;
-        
-        
-        this.text = new St.Label({
-            text: "Loading",
-            y_expand: true,
-            y_align: Clutter.ActorAlign.CENTER
-        });
+        _loadGUI() {
+            this._menuLayout = new St.BoxLayout({
+                vertical: false,
+                clip_to_allocation: true,
+                x_align: Clutter.ActorAlign.START,
+                y_align: Clutter.ActorAlign.CENTER,
+                reactive: true,
+                x_expand: true,
+                pack_start: false
+            });
 
 
-        this._menuLayout.add_actor(this.icon);
-        this._menuLayout.add_actor(this.text);
-        this.add_actor(this._menuLayout);
+            this._confettiGicon = Gio.icon_new_for_string(Me.path + "/assets/party-popper.png");
+            this._alarmIcon = new St.Icon({
+                icon_name: 'alarm-symbolic',
+                style_class: 'system-status-icon'
+            });
 
-        return;
-    }
-
-
-    _initialiseMenu() {
-        const settingsItem = new PopupMenu.PopupMenuItem(_('Settings'));
-        settingsItem.connect('activate', () => {
-            ExtensionUtils.openPrefs();
-        });
-        this.menu.addMenuItem(settingsItem);
-    }
+            this.icon = this._alarmIcon;
 
 
-    setText(text) {
-        this.text.set_text(text);
-    }
-
-    
-    showAlarmIcon() {
-        this.icon.set_icon_name("alarm-symbolic");
-    }
+            this.text = new St.Label({
+                text: "Loading",
+                y_expand: true,
+                y_align: Clutter.ActorAlign.CENTER
+            });
 
 
-    showConfettiIcon() {
-        this.icon.set_gicon(this._confettiGicon);
-    }
+            this._menuLayout.add_actor(this.icon);
+            this._menuLayout.add_actor(this.text);
+            this.add_actor(this._menuLayout);
+
+            return;
+        }
 
 
-    vfunc_event(event) {
-        
-        if ((event.type() == Clutter.EventType.TOUCH_END || event.type() == Clutter.EventType.BUTTON_RELEASE)) {
-            
-            if (event.get_button() === Clutter.BUTTON_PRIMARY) {
+        _initialiseMenu() {
+            const settingsItem = new PopupMenu.PopupMenuItem(_('Settings'));
+            settingsItem.connect('activate', () => {
+                ExtensionUtils.openPrefs();
+            });
+            this.menu.addMenuItem(settingsItem);
+        }
 
-                // Show calendar on left click
-                if (this.menu.isOpen) {
-                    this.menu._getTopMenu().close();
+
+        setText(text) {
+            this.text.set_text(text);
+        }
+
+
+        showAlarmIcon() {
+            this.icon.set_icon_name("alarm-symbolic");
+        }
+
+
+        showConfettiIcon() {
+            this.icon.set_gicon(this._confettiGicon);
+        }
+
+
+        vfunc_event(event) {
+
+            if ((event.type() == Clutter.EventType.TOUCH_END || event.type() == Clutter.EventType.BUTTON_RELEASE)) {
+
+                if (event.get_button() === Clutter.BUTTON_PRIMARY) {
+
+                    // Show calendar on left click
+                    if (this.menu.isOpen) {
+                        this.menu._getTopMenu().close();
+                    }
+                    else {
+                        Main.panel.toggleCalendar();
+                    }
+
                 }
                 else {
-                    Main.panel.toggleCalendar();
+                    // Show settings menu on right click
+                    this.menu.toggle();
                 }
+            }
 
-            }
-            else {
-                // Show settings menu on right click
-                this.menu.toggle();
-            }
+            return Clutter.EVENT_PROPAGATE;
         }
-        
-        return Clutter.EVENT_PROPAGATE;
-    }
-});
+    });
 
 
 
 class Extension {
     constructor(uuid) {
         this._uuid = uuid;
-        
+
         ExtensionUtils.initTranslations(GETTEXT_DOMAIN);
     }
-    
+
     enable() {
         this._indicator = new Indicator();
 
@@ -151,36 +151,36 @@ class Extension {
             this.unloadIndicator();
             this.loadIndicator();
         });
-        
+
 
         // Wait 3 seconds before loading the indicator
         // So that it isn't loaded too early and positioned after other elements in the panel
         GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 3, () => {
             this.loadIndicator();
             this._startLoop();
-            
+
             return false;
         });
 
     }
-    
+
     _startLoop() {
         this.sourceId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             5,                               // seconds to wait
             () => {
                 this.refreshIndicator();
-                
+
                 return GLib.SOURCE_CONTINUE;
             }
-            );
-        }
+        );
+    }
 
-        _stopLoop() {
+    _stopLoop() {
         GLib.Source.remove(this.sourceId);
     }
 
-    
+
     loadIndicator() {
 
         const boxes = [
@@ -199,12 +199,12 @@ class Extension {
         this._indicator.container.get_parent().remove_actor(this._indicator.container);
     }
 
-    
+
     refreshIndicator() {
         const todaysEvents = DateHelperFunctions.getTodaysEvents(this._indicator._calendarSource);
         const eventStatus = DateHelperFunctions.getNextEventsToDisplay(todaysEvents);
         const text = DateHelperFunctions.eventStatusToIndicatorText(eventStatus);
-        
+
 
         if ((eventStatus.currentEvent === null) && (eventStatus.nextEvent === null)) {
             this._indicator.showConfettiIcon();
@@ -227,7 +227,7 @@ class Extension {
 
         this._indicator.destroy();
         this._indicator = null;
-        
+
         this._stopLoop();
     }
 }

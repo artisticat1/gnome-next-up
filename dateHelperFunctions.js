@@ -44,7 +44,7 @@ function getNextEventsToDisplay(todaysEvents) {
         const eventEnd = event.end;
 
         if (now < eventStart) {
-            
+
             nextEvent = event;
             break;
         }
@@ -57,42 +57,42 @@ function getNextEventsToDisplay(todaysEvents) {
 
                 let someNextEvent;
 
-                for (let j = i+1; j < N; j++) {
+                for (let j = i + 1; j < N; j++) {
 
                     someNextEvent = todaysEvents[j];
 
                     // Check whether the next event overlaps the current event
                     // or whether they start at the same time
-    
+
                     if (!(someNextEvent.date.valueOf() === currentEvent.date.valueOf())) {
                         nextEvent = someNextEvent;
                         done = true;
                         break;
                     }
                 }
-                    
+
             }
         }
     }
 
-    
+
     return {
-            currentEvent: currentEvent,
-            nextEvent: nextEvent
-        };
+        currentEvent: currentEvent,
+        nextEvent: nextEvent
+    };
 }
 
 
 
 function eventStatusToIndicatorText(eventStatus) {
-    
+
     function displayNextEvent(event) {
         const timeText = getTimeOfEventAsText(event.date);
         const diffText = getTimeToEventAsText(event.date);
 
         const summary = trimLongEventName(event.summary);
-        
-        
+
+
         return `In ${diffText}: ${summary} at ${timeText}`;
     }
 
@@ -101,14 +101,14 @@ function eventStatusToIndicatorText(eventStatus) {
         const timeText = getTimeOfEventAsText(nextEvent.date);
 
         const summary = trimLongEventName(nextEvent.summary);
-        
+
 
         return `Ends in ${endsInText}. Next: ${summary} at ${timeText}`;
     }
 
     function displayCurrentEvent(event) {
         const endsInText = getTimeToEventAsText(event.end);
-        
+
         return `Ends in ${endsInText}: ${event.summary}`;
     }
 
@@ -154,7 +154,7 @@ function getTimeToEventAsText(eventDate) {
 
     const now = new Date();
     const diff = Math.abs(eventDate - now);
-    const diffInMins = diff / (1000*60);
+    const diffInMins = diff / (1000 * 60);
 
     const hrDiff = Math.floor(diffInMins / 60);
     const minDiff = Math.ceil(diffInMins % 60);

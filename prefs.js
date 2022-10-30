@@ -13,7 +13,7 @@ function fillPreferencesWindow(window) {
     // Use the same GSettings schema as in `extension.js`
     const settings = ExtensionUtils.getSettings(
         'org.gnome.shell.extensions.next-up');
-    
+
     // Create a preferences page and group
     const page = new Adw.PreferencesPage();
     const group = new Adw.PreferencesGroup();
