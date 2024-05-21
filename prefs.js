@@ -1,10 +1,12 @@
 'use strict';
 
-const { Adw, Gio, Gtk } = imports.gi;
+import Adw from 'gi://Adw';
+import Gio from 'gi://Gio';
+import Gtk from 'gi://Gtk';
 
-const ExtensionUtils = imports.misc.extensionUtils;
+import * as ExtensionUtils from 'resource:///org/gnome/Shell/Extensions/js/misc/extensionUtils.js';
+
 const Me = ExtensionUtils.getCurrentExtension();
-
 
 function init() {
 }
