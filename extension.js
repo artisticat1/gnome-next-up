@@ -80,7 +80,10 @@ export default class NextUpExtension extends Extension {
 
     const whichPanel = this._settings.get_int("which-panel");
 
-    boxes[whichPanel].insert_child_at_index(this._indicator.container, 0);
+    // If aligned to left, place it after workspaces indicator
+    const index = whichPanel === 0 ? 1 : 0;
+
+    boxes[whichPanel].insert_child_at_index(this._indicator.container, index);
   }
 
   unloadIndicator() {
