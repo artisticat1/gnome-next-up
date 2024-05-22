@@ -24,12 +24,17 @@ import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 
 import Indicator from "./src/indicator.js";
 import * as DateHelperFunctions from "./src/date.js";
+import Gio from "gi://Gio";
 
 const IndicatorInstance = GObject.registerClass(Indicator);
 
 export default class NextUpExtension extends Extension {
   enable() {
-    this._indicator = new IndicatorInstance();
+    this._indicator = new IndicatorInstance({
+      confettiGicon: Gio.icon_new_for_string(
+        this.path + "/assets/party-popper.png"
+      ),
+    });
 
     this._settings = this.getSettings();
     this._settingChangedSignal = this._settings.connect(

@@ -1,6 +1,5 @@
 import St from "gi://St";
 import Clutter from "gi://Clutter";
-import Gio from "gi://Gio";
 import * as ExtensionUtils from "resource:///org/gnome/shell/misc/extensionUtils.js";
 import * as Calendar from "resource:///org/gnome/shell/ui/calendar.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
@@ -9,6 +8,11 @@ import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import { gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
 
 export default class Indicator extends PanelMenu.Button {
+  constructor(props) {
+    super();
+    this._confettiGicon = props.confettiGicon;
+  }
+
   _init() {
     super._init(0.0, _("Next Up Indicator"));
 
@@ -29,9 +33,6 @@ export default class Indicator extends PanelMenu.Button {
       pack_start: false,
     });
 
-    this._confettiGicon = Gio.icon_new_for_string(
-      this.path + "./assets/party-popper.png"
-    );
     this._alarmIcon = new St.Icon({
       icon_name: "alarm-symbolic",
       style_class: "system-status-icon",
@@ -44,8 +45,6 @@ export default class Indicator extends PanelMenu.Button {
       y_expand: true,
       y_align: Clutter.ActorAlign.CENTER,
     });
-
-    console.log("HERE!", this._menuLayout);
 
     this._menuLayout.add_child(this.icon);
     this._menuLayout.add_child(this.text);
