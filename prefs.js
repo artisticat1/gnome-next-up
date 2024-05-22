@@ -1,20 +1,18 @@
-'use strict';
+"use strict";
 
-import Adw from 'gi://Adw';
-import Gio from 'gi://Gio';
-import Gtk from 'gi://Gtk';
+import Adw from "gi://Adw";
+import Gio from "gi://Gio";
+import Gtk from "gi://Gtk";
 
-import * as ExtensionUtils from 'resource:///org/gnome/Shell/Extensions/js/misc/extensionUtils.js';
+import {
+  ExtensionPreferences,
+  gettext as _,
+} from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 
-const Me = ExtensionUtils.getCurrentExtension();
-
-function init() {
-}
-
-function fillPreferencesWindow(window) {
+export default class NextUpExtensionPreferences extends ExtensionPreferences {
+  fillPreferencesWindow(window) {
     // Use the same GSettings schema as in `extension.js`
-    const settings = ExtensionUtils.getSettings(
-        'org.gnome.shell.extensions.next-up');
+    const settings = this.getSettings();
 
     // Create a preferences page and group
     const page = new Adw.PreferencesPage();
@@ -26,21 +24,21 @@ function fillPreferencesWindow(window) {
     group.add(row);
 
     const dropdown = new Gtk.DropDown({
-        model: Gtk.StringList.new(["Left", "Center", "Right"]),
-        valign: Gtk.Align.CENTER
+      model: Gtk.StringList.new(["Left", "Center", "Right"]),
+      valign: Gtk.Align.CENTER,
     });
 
     settings.bind(
-        "which-panel",
-        dropdown,
-        "selected",
-        Gio.SettingsBindFlags.DEFAULT
+      "which-panel",
+      dropdown,
+      "selected",
+      Gio.SettingsBindFlags.DEFAULT
     );
-
 
     row.add_suffix(dropdown);
     row.activatable_widget = dropdown;
 
     // Add our page to the window
     window.add(page);
+  }
 }
