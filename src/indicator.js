@@ -11,6 +11,7 @@ export default class Indicator extends PanelMenu.Button {
   constructor(props) {
     super();
     this._confettiGicon = props.confettiGicon;
+    this._openPrefsCallback = props.openPrefsCallback;
   }
 
   _init() {
@@ -56,7 +57,7 @@ export default class Indicator extends PanelMenu.Button {
   _initialiseMenu() {
     const settingsItem = new PopupMenu.PopupMenuItem(_("Settings"));
     settingsItem.connect("activate", () => {
-      ExtensionUtils.openPrefs();
+      this._openPrefsCallback();
     });
     this.menu.addMenuItem(settingsItem);
   }

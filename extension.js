@@ -34,6 +34,7 @@ export default class NextUpExtension extends Extension {
       confettiGicon: Gio.icon_new_for_string(
         this.path + "/assets/party-popper.png"
       ),
+      openPrefsCallback: this.openPreferences.bind(this),
     });
 
     this._settings = this.getSettings();
