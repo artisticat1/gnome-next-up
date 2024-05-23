@@ -8,6 +8,15 @@ function trimLongEventName(summary) {
   }
 }
 
+function notFullDayEvent(event) {
+  return !(
+    event.date.getHours() === 0 &&
+    event.date.getMinutes() === 0 &&
+    event.end.getHours() === 0 &&
+    event.end.getMinutes() === 0
+  );
+}
+
 export function getTodaysEvents(calendarSource) {
   const src = calendarSource;
   src._loadEvents(true);
@@ -18,7 +27,7 @@ export function getTodaysEvents(calendarSource) {
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
-  const todaysEvents = src.getEvents(today, tomorrow);
+  const todaysEvents = src.getEvents(today, tomorrow).filter(notFullDayEvent);
 
   return todaysEvents;
 }
