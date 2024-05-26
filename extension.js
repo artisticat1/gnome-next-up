@@ -114,6 +114,7 @@ export default class NextUpExtension extends Extension {
     Main.panel._centerBox.remove_child(this._indicator.container);
 
     this._settings.disconnect(this._settingChangedSignal);
+    this._settings = null;
 
     this._indicator.destroy();
     this._indicator = null;
