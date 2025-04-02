@@ -2,9 +2,9 @@
   "name": "Next Up",
   "description": "Show your next calendar event in the status bar",
   "uuid": "next-up@artisticat1.github.com",
-  "shell-version": ["45", "46", "47"],
+  "shell-version": ["45", "46", "47", "48"],
   "url": "https://github.com/artisticat1/gnome-next-up",
   "settings-schema": "org.gnome.shell.extensions.next-up",
   "gettext-domain": "next-up-indicator-extension",
-  "version": 6
+  "version": 7
 }
