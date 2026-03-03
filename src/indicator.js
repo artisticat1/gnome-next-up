@@ -34,7 +34,7 @@ export default class Indicator extends PanelMenu.Button {
     });
 
     this._alarmIcon = new St.Icon({
-      icon_name: "alarm-symbolic",
+      icon_name: "x-office-calendar-symbolic",
       style_class: "system-status-icon",
     });
 
@@ -65,8 +65,21 @@ export default class Indicator extends PanelMenu.Button {
     this.text.set_text(text);
   }
 
+  setTextColor(color) {
+    if (typeof color === "string" && color.trim().length > 0) {
+      this.text.set_style(`color: ${color.trim()};`);
+      return;
+    }
+
+    this.text.set_style("");
+  }
+
   showAlarmIcon() {
     this.icon.set_icon_name("alarm-symbolic");
+  }
+
+  showCalendarIcon() {
+    this.icon.set_icon_name("x-office-calendar-symbolic");
   }
 
   showConfettiIcon() {
