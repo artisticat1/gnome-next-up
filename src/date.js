@@ -148,8 +148,9 @@ function eventStatusToText(eventStatus, lookaheadMode, getDiffText) {
 
   function displayCurrentEvent(event) {
     const endsInText = getDiffText(event.end);
+    const summary = trimLongEventName(event.summary);
 
-    return `Ends in ${endsInText}: ${event.summary}`;
+    return `Ends in ${endsInText}: ${summary}`;
   }
 
   const { currentEvent, nextEvent } = eventStatus;

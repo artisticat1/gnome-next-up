@@ -60,6 +60,9 @@ const MAX_FONT_SIZE_PX = 72;
 const DEFAULT_LOCK_SCREEN_FONT_SIZE = 14;
 const DEFAULT_DESKTOP_FONT_SIZE = 14;
 const LOCK_SCREEN_DEBUG_REVISION = "lockscreen-debug-r3";
+const DEBUG_LOCK_SCREEN_ENV = "NEXT_UP_DEBUG_LOCK_SCREEN";
+const SENSITIVE_DEBUG_KEY_PATTERN = /(text|preview|summary)/i;
+const REDACTED_LOG_VALUE = "[redacted]";
 const INDICATOR_TIMING_STATE = {
   NONE: "none",
   COMING_UP: "coming-up",
@@ -73,6 +76,7 @@ function clamp(value, min, max) {
 export default class NextUpExtension extends Extension {
   enable() {
     this._extensionRevision = LOCK_SCREEN_DEBUG_REVISION;
+    this._debugLogsEnabled = GLib.getenv(DEBUG_LOCK_SCREEN_ENV) === "1";
     this._indicator = new IndicatorInstance({
       confettiGicon: Gio.icon_new_for_string(
         this.path + "/assets/party-popper.png"
@@ -536,14 +540,13 @@ export default class NextUpExtension extends Extension {
     const reason = options.reason ?? "unspecified";
     const clockLabel = this._lockScreenMessageLabel;
     const promptLabel = this._unlockPromptMessageLabel;
-    const hadDialog = Boolean(this._lockScreenDialog);
 
     this._debugLockScreen("Clearing lock-screen actors", {
       reason,
       removeFromParent,
       hasClockLabel: Boolean(clockLabel),
       hasPromptLabel: Boolean(promptLabel),
-      hasDialog: hadDialog,
+      hasDialog: Boolean(this._lockScreenDialog),
     });
 
     this._lockScreenMessageLabel = null;
@@ -554,12 +557,10 @@ export default class NextUpExtension extends Extension {
       return;
     }
 
-    if (hadDialog) {
-      this._removeActor(clockLabel, "lock-screen clock label");
-      this._removeActor(promptLabel, "unlock prompt label");
-    } else {
-      this._debugLockScreen("Skipping remove_child while dialog reference is null");
-    }
+    // Remove by actual parent relationship to avoid stale labels
+    // if dialog tracking state is already out of sync.
+    this._removeActor(clockLabel, "lock-screen clock label");
+    this._removeActor(promptLabel, "unlock prompt label");
   }
 
   _clearDesktopMessageActor(options = {}) {
@@ -590,15 +591,39 @@ export default class NextUpExtension extends Extension {
     return this._currentDesktopText ?? "";
   }
 
-  _previewText(text, maxLength = 120) {
-    if (text.length <= maxLength) {
-      return text;
+  _sanitizeDebugDetails(details, parentKey = "") {
+    if (details === null || details === undefined) {
+      return details;
     }
 
-    return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+    if (Array.isArray(details)) {
+      return details.map((entry) => this._sanitizeDebugDetails(entry, parentKey));
+    }
+
+    if (typeof details === "object") {
+      const sanitized = {};
+      for (const [key, value] of Object.entries(details)) {
+        if (SENSITIVE_DEBUG_KEY_PATTERN.test(key)) {
+          sanitized[key] = REDACTED_LOG_VALUE;
+          continue;
+        }
+        sanitized[key] = this._sanitizeDebugDetails(value, key);
+      }
+      return sanitized;
+    }
+
+    if (typeof details === "string" && SENSITIVE_DEBUG_KEY_PATTERN.test(parentKey)) {
+      return REDACTED_LOG_VALUE;
+    }
+
+    return details;
   }
 
   _debugLockScreen(message, details = null) {
+    if (!this._debugLogsEnabled) {
+      return;
+    }
+
     const prefix = `[${this.uuid}] lock-screen`;
 
     if (details === null || details === undefined) {
@@ -608,7 +633,7 @@ export default class NextUpExtension extends Extension {
 
     let detailsText = "";
     try {
-      detailsText = JSON.stringify(details);
+      detailsText = JSON.stringify(this._sanitizeDebugDetails(details));
     } catch {
       detailsText = String(details);
     }
@@ -639,8 +664,6 @@ export default class NextUpExtension extends Extension {
       label.visible = text.length > 0;
       this._debugLockScreen(`Updated ${labelName}`, {
         visible: label.visible,
-        textLength: text.length,
-        preview: this._previewText(text),
       });
     } catch (error) {
       this._debugLockScreen(`Failed to update ${labelName}`, {
@@ -734,10 +757,7 @@ export default class NextUpExtension extends Extension {
   }
 
   _setLockScreenMessage(text) {
-    this._debugLockScreen("Applying lock-screen message", {
-      textLength: text.length,
-      preview: this._previewText(text),
-    });
+    this._debugLockScreen("Applying lock-screen message", { hasText: text.length > 0 });
     this._syncLockScreenMessageActor();
 
     if (!this._settings.get_boolean("show-on-lock-screen")) {
@@ -918,14 +938,7 @@ export default class NextUpExtension extends Extension {
       showOnlyTimer,
       indicatorTimingState,
       indicatorStatusColor,
-      topBarTextLength: topBarText.length,
-      topBarPreview: this._previewText(topBarText),
-      fullTextLength: fullIndicatorText.length,
-      fullTextPreview: this._previewText(fullIndicatorText),
-      lockScreenTextLength: lockScreenText.length,
-      lockScreenTextPreview: this._previewText(lockScreenText),
       desktopEventsToShow,
-      desktopTextLength: desktopText.length,
     });
 
     if (eventStatus.currentEvent === null && eventStatus.nextEvent === null) {
@@ -985,7 +998,7 @@ export default class NextUpExtension extends Extension {
     }
 
     this._clearLockScreenMessageActors({
-      removeFromParent: false,
+      removeFromParent: true,
       reason: "disable",
     });
     this._clearDesktopMessageActor({
@@ -995,6 +1008,7 @@ export default class NextUpExtension extends Extension {
 
     this._currentIndicatorText = "";
     this._currentDesktopText = "";
+    this._debugLogsEnabled = false;
     this._settings = null;
 
     this._indicator.destroy();
