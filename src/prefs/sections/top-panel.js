@@ -56,6 +56,18 @@ export function buildTopPanelSection(settings, topPaneGroup) {
   );
   topPaneGroup.add(showOnlyTimerRow);
 
+  const use24HourFormatRow = new Adw.SwitchRow({
+    title: "Use 24-hour time",
+    subtitle: "Turn off to show times in 12-hour format (AM/PM)",
+  });
+  settings.bind(
+    "use-24-hour-format",
+    use24HourFormatRow,
+    "active",
+    Gio.SettingsBindFlags.DEFAULT
+  );
+  topPaneGroup.add(use24HourFormatRow);
+
   const refreshRow = new Adw.ActionRow({
     title: "Refresh interval",
     subtitle: "How often the indicator updates",

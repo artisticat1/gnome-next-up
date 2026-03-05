@@ -26,6 +26,19 @@ import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 
 import Indicator from "./src/indicator.js";
 import * as DateHelperFunctions from "./src/date.js";
+import Log from "./src/log.js";
+import {
+  connectTopPanelActions,
+  disconnectTopPanelActions,
+} from "./src/actions/top-panel.js";
+import {
+  connectDesktopBackgroundActions,
+  disconnectDesktopBackgroundActions,
+} from "./src/actions/desktop-background.js";
+import {
+  connectLockScreenActions,
+  disconnectLockScreenActions,
+} from "./src/actions/lock-screen.js";
 import Gio from "gi://Gio";
 
 const IndicatorInstance = GObject.registerClass(Indicator);
@@ -59,8 +72,11 @@ const MIN_FONT_SIZE_PX = 8;
 const MAX_FONT_SIZE_PX = 72;
 const DEFAULT_LOCK_SCREEN_FONT_SIZE = 14;
 const DEFAULT_DESKTOP_FONT_SIZE = 14;
-const LOCK_SCREEN_DEBUG_REVISION = "lockscreen-debug-r3";
-const DEBUG_LOCK_SCREEN_ENV = "NEXT_UP_DEBUG_LOCK_SCREEN";
+const DEBUG_LOG_PREFIX = "next-up@artisticat1.github.com";
+const LOCK_SCREEN_DEBUG_REVISION = "lockscreen-debug-r4";
+const LOCK_SCREEN_SYNC_RETRY_DELAY_MS = 250;
+const LOCK_SCREEN_SYNC_MAX_RETRIES = 12;
+const CALENDAR_INITIAL_SYNC_TIMEOUT_MS = 15000;
 const SENSITIVE_DEBUG_KEY_PATTERN = /(text|preview|summary)/i;
 const REDACTED_LOG_VALUE = "[redacted]";
 const INDICATOR_TIMING_STATE = {
@@ -76,7 +92,7 @@ function clamp(value, min, max) {
 export default class NextUpExtension extends Extension {
   enable() {
     this._extensionRevision = LOCK_SCREEN_DEBUG_REVISION;
-    this._debugLogsEnabled = GLib.getenv(DEBUG_LOCK_SCREEN_ENV) === "1";
+    this._logger = new Log(DEBUG_LOG_PREFIX);
     this._indicator = new IndicatorInstance({
       confettiGicon: Gio.icon_new_for_string(
         this.path + "/assets/party-popper.png"
@@ -85,116 +101,17 @@ export default class NextUpExtension extends Extension {
     });
 
     this._settings = this.getSettings();
+    this._debugLogsEnabled = false;
     this._normalizeRefreshIntervalSettings();
     this._normalizeStatusHighlightSettings();
     this._currentIndicatorText = "";
     this._currentDesktopText = "";
-    this._whichPanelChangedSignal = this._settings.connect(
-      "changed::which-panel",
-      () => {
-        this.unloadIndicator();
-        this.loadIndicator();
-      }
-    );
-    this._eventLookaheadChangedSignal = this._settings.connect(
-      "changed::event-lookahead",
-      () => this.refreshIndicator()
-    );
-    this._showOnlyTimerChangedSignal = this._settings.connect(
-      "changed::show-only-timer",
-      () => this.refreshIndicator()
-    );
-    this._refreshIntervalValueChangedSignal = this._settings.connect(
-      "changed::refresh-interval-value",
-      () => this._restartLoop()
-    );
-    this._refreshIntervalUnitChangedSignal = this._settings.connect(
-      "changed::refresh-interval-unit",
-      () => this._restartLoop()
-    );
-    this._comingUpColorChangedSignal = this._settings.connect(
-      "changed::coming-up-color",
-      () => this.refreshIndicator()
-    );
-    this._comingUpThresholdValueChangedSignal = this._settings.connect(
-      "changed::coming-up-threshold-value",
-      () => this.refreshIndicator()
-    );
-    this._comingUpThresholdUnitChangedSignal = this._settings.connect(
-      "changed::coming-up-threshold-unit",
-      () => this.refreshIndicator()
-    );
-    this._startingSoonColorChangedSignal = this._settings.connect(
-      "changed::starting-soon-color",
-      () => this.refreshIndicator()
-    );
-    this._startingSoonThresholdValueChangedSignal = this._settings.connect(
-      "changed::starting-soon-threshold-value",
-      () => this.refreshIndicator()
-    );
-    this._startingSoonThresholdUnitChangedSignal = this._settings.connect(
-      "changed::starting-soon-threshold-unit",
-      () => this.refreshIndicator()
-    );
-    this._showOnLockScreenChangedSignal = this._settings.connect(
-      "changed::show-on-lock-screen",
-      () => {
-        this._debugLockScreen("Setting changed: show-on-lock-screen", {
-          enabled: this._settings.get_boolean("show-on-lock-screen"),
-        });
-        this.refreshIndicator();
-      }
-    );
-    this._showOnDesktopChangedSignal = this._settings.connect(
-      "changed::show-on-desktop",
-      () => this.refreshIndicator()
-    );
-    this._desktopEventsToShowChangedSignal = this._settings.connect(
-      "changed::desktop-events-to-show",
-      () => this.refreshIndicator()
-    );
-    this._desktopHorizontalAlignChangedSignal = this._settings.connect(
-      "changed::desktop-horizontal-align",
-      () => this._setDesktopMessage(this._getCurrentDesktopText())
-    );
-    this._desktopVerticalAlignChangedSignal = this._settings.connect(
-      "changed::desktop-vertical-align",
-      () => this._setDesktopMessage(this._getCurrentDesktopText())
-    );
-    this._lockScreenFontSizeChangedSignal = this._settings.connect(
-      "changed::lock-screen-font-size",
-      () => this._setLockScreenMessage(this._getCurrentIndicatorText())
-    );
-    this._desktopFontSizeChangedSignal = this._settings.connect(
-      "changed::desktop-font-size",
-      () => this._setDesktopMessage(this._getCurrentDesktopText())
-    );
-    this._lockScreenActiveChangedSignal = Main.screenShield.connect(
-      "active-changed",
-      () => {
-        this._debugLockScreen("screenShield active-changed", {
-          active: Main.screenShield?.active ?? null,
-        });
-        this.refreshIndicator();
-      }
-    );
-    this._lockScreenLockedChangedSignal = Main.screenShield.connect(
-      "locked-changed",
-      () => {
-        this._debugLockScreen("screenShield locked-changed", {
-          locked: Main.screenShield?.locked ?? null,
-        });
-        this.refreshIndicator();
-      }
-    );
-    this._calendarSourceChangedSignal = this._indicator._calendarSource.connect(
-      "changed",
-      () => this.refreshIndicator()
-    );
-    this._monitorsChangedSignal = Main.layoutManager.connect(
-      "monitors-changed",
-      () => this._repositionDesktopMessageLabel()
-    );
+    this._calendarInitialSyncComplete = false;
+    this._calendarInitialSyncTimedOut = false;
+    this._startCalendarInitialSyncWatchdog();
+    this._lockScreenActions = connectLockScreenActions(this);
+    this._topPanelActions = connectTopPanelActions(this);
+    this._desktopBackgroundActions = connectDesktopBackgroundActions(this);
 
     // Wait 3 seconds before loading the indicator
     // So that it isn't loaded too early and positioned after other elements in the panel
@@ -247,6 +164,47 @@ export default class NextUpExtension extends Extension {
     this._stopLoop();
     this.refreshIndicator();
     this._startLoop();
+  }
+
+  _clearCalendarInitialSyncWatchdog() {
+    if (this._calendarInitialSyncTimeoutId) {
+      GLib.Source.remove(this._calendarInitialSyncTimeoutId);
+      this._calendarInitialSyncTimeoutId = null;
+    }
+  }
+
+  _startCalendarInitialSyncWatchdog() {
+    this._clearCalendarInitialSyncWatchdog();
+    this._calendarInitialSyncTimeoutId = GLib.timeout_add(
+      GLib.PRIORITY_DEFAULT,
+      CALENDAR_INITIAL_SYNC_TIMEOUT_MS,
+      () => {
+        this._calendarInitialSyncTimeoutId = null;
+        if (this._calendarInitialSyncComplete) {
+          return GLib.SOURCE_REMOVE;
+        }
+
+        this._calendarInitialSyncTimedOut = true;
+        this._markCalendarInitialSyncComplete("timeout", {
+          timeoutMs: CALENDAR_INITIAL_SYNC_TIMEOUT_MS,
+        });
+        this.refreshIndicator();
+        return GLib.SOURCE_REMOVE;
+      }
+    );
+  }
+
+  _markCalendarInitialSyncComplete(reason = "unspecified", details = {}) {
+    if (this._calendarInitialSyncComplete) {
+      return;
+    }
+
+    this._calendarInitialSyncComplete = true;
+    this._clearCalendarInitialSyncWatchdog();
+    this._logger.info("top-panel: initial calendar sync complete", {
+      reason,
+      ...details,
+    });
   }
 
   _getRefreshIntervalInSeconds() {
@@ -441,7 +399,24 @@ export default class NextUpExtension extends Extension {
   }
 
   _getLockScreenDialog() {
-    return Main.screenShield?._dialog ?? null;
+    const shield = Main.screenShield ?? null;
+    if (!shield) {
+      return null;
+    }
+
+    if (shield._dialog) {
+      return shield._dialog;
+    }
+
+    const lockDialogGroup = shield._lockDialogGroup ?? null;
+    const children = lockDialogGroup?.get_children?.() ?? [];
+    for (const child of children) {
+      if (child?._clock || child?._promptBox) {
+        return child;
+      }
+    }
+
+    return null;
   }
 
   _getClampedFontSize(settingKey, fallback) {
@@ -473,7 +448,7 @@ export default class NextUpExtension extends Extension {
 
   _getLockScreenLabelStyle() {
     const fontSize = this._getLockScreenFontSize();
-    return `margin-top: 12px; margin-bottom: 12px; max-width: 42em; opacity: 255; font-size: ${fontSize}px;`;
+    return `margin-top: 12px; margin-bottom: 12px; max-width: 42em; opacity: 255; color: #ffffff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); font-size: ${fontSize}px;`;
   }
 
   _getDesktopLabelStyle(maxWidth) {
@@ -494,10 +469,99 @@ export default class NextUpExtension extends Extension {
       style_class: "unlock-dialog-clock-hint",
       x_align: Clutter.ActorAlign.CENTER,
       visible: false,
+      reactive: false,
+      can_focus: false,
+      track_hover: false,
     });
     label.clutter_text.line_wrap = true;
     label.set_style(this._getLockScreenLabelStyle());
     return label;
+  }
+
+  _getScreenShieldGroup() {
+    return Main.layoutManager?.screenShieldGroup ?? Main.screenShield?.actor ?? null;
+  }
+
+  _positionLockScreenOverlayLabel() {
+    const label = this._lockScreenOverlayLabel;
+    const monitor = Main.layoutManager?.primaryMonitor;
+    if (!label || !monitor) {
+      return;
+    }
+
+    label.set_width(-1);
+    const [, natWidth] = label.get_preferred_width(-1);
+    const [, natHeight] = label.get_preferred_height(-1);
+    const width = Math.min(Math.max(220, natWidth), Math.floor(monitor.width * 0.8));
+    const height = Math.max(24, natHeight);
+    label.set_width(width);
+
+    const x = monitor.x + Math.round((monitor.width - width) / 2);
+    const y = monitor.y + 24;
+    label.set_position(x, y);
+    label.set_height(height);
+  }
+
+  _clearLockScreenOverlayLabel() {
+    if (!this._lockScreenOverlayLabel) {
+      return;
+    }
+    this._removeActor(this._lockScreenOverlayLabel, "lock-screen overlay label");
+    this._lockScreenOverlayLabel = null;
+  }
+
+  _ensureLockScreenOverlayLabel() {
+    const shieldGroup = this._getScreenShieldGroup();
+    if (!shieldGroup) {
+      return null;
+    }
+
+    if (!this._lockScreenOverlayLabel) {
+      const label = this._createLockScreenMessageLabel();
+      label.x_align = Clutter.ActorAlign.START;
+      label.y_align = Clutter.ActorAlign.START;
+      label.x_expand = false;
+      label.y_expand = false;
+      label.set_style(
+        `${this._getLockScreenLabelStyle()} padding: 8px 12px; border-radius: 8px; background-color: rgba(0, 0, 0, 0.55);`
+      );
+      shieldGroup.add_child(label);
+      this._lockScreenOverlayLabel = label;
+      this._debugLockScreen("Added lock-screen overlay label to screenShieldGroup");
+    }
+
+    return this._lockScreenOverlayLabel;
+  }
+
+  _updateLockScreenOverlayLabel(text) {
+    const shield = Main.screenShield ?? null;
+    const showOnLockScreen =
+      this._settings?.get_boolean("show-on-lock-screen") ?? false;
+    const shouldShowOverlay =
+      showOnLockScreen && Boolean(shield?.active || shield?.locked);
+
+    if (!shouldShowOverlay) {
+      this._clearLockScreenOverlayLabel();
+      return false;
+    }
+
+    const overlayLabel = this._ensureLockScreenOverlayLabel();
+    if (!overlayLabel) {
+      return false;
+    }
+
+    this._setLabelText(
+      overlayLabel,
+      text,
+      "lock-screen overlay label",
+      "_lockScreenOverlayLabel",
+      { suppressMissingActorLog: true }
+    );
+    this._positionLockScreenOverlayLabel();
+    this._debugLockScreen("Updated lock-screen overlay label", {
+      actorState: this._getActorDebugState(overlayLabel),
+    });
+    return true;
   }
 
   _getDesktopBackgroundGroup() {
@@ -540,18 +604,29 @@ export default class NextUpExtension extends Extension {
     const reason = options.reason ?? "unspecified";
     const clockLabel = this._lockScreenMessageLabel;
     const promptLabel = this._unlockPromptMessageLabel;
+    const fallbackLabel = this._lockScreenFallbackLabel;
+    const overlayLabel = this._lockScreenOverlayLabel;
 
     this._debugLockScreen("Clearing lock-screen actors", {
       reason,
       removeFromParent,
       hasClockLabel: Boolean(clockLabel),
       hasPromptLabel: Boolean(promptLabel),
+      hasFallbackLabel: Boolean(fallbackLabel),
+      hasOverlayLabel: Boolean(overlayLabel),
       hasDialog: Boolean(this._lockScreenDialog),
     });
 
     this._lockScreenMessageLabel = null;
     this._unlockPromptMessageLabel = null;
+    this._lockScreenFallbackLabel = null;
+    this._lockScreenOverlayLabel = null;
     this._lockScreenDialog = null;
+
+    // The fallback label is attached directly to lockDialogGroup, so remove it
+    // whenever we clear lock-screen actors to avoid stale orphan actors.
+    this._removeActor(fallbackLabel, "lock-screen fallback label");
+    this._removeActor(overlayLabel, "lock-screen overlay label");
 
     if (!removeFromParent) {
       return;
@@ -591,6 +666,119 @@ export default class NextUpExtension extends Extension {
     return this._currentDesktopText ?? "";
   }
 
+  _isActorEffectivelyVisible(actor) {
+    if (!actor) {
+      return false;
+    }
+
+    const parent = actor.get_parent?.() ?? null;
+    return Boolean(
+      actor.visible &&
+        actor.mapped &&
+        actor.opacity > 0 &&
+        parent &&
+        parent.visible &&
+        parent.mapped &&
+        parent.opacity > 0
+    );
+  }
+
+  _clearLockScreenSyncRetry() {
+    if (this._lockScreenSyncRetrySourceId) {
+      GLib.Source.remove(this._lockScreenSyncRetrySourceId);
+      this._lockScreenSyncRetrySourceId = null;
+    }
+    this._lockScreenSyncRetryAttempts = 0;
+  }
+
+  _scheduleLockScreenSyncRetry(reason = "unspecified") {
+    const showOnLockScreen =
+      this._settings?.get_boolean("show-on-lock-screen") ?? false;
+    const shield = Main.screenShield ?? null;
+    const shouldRetry =
+      showOnLockScreen && Boolean(shield?.active || shield?.locked);
+
+    if (!shouldRetry) {
+      this._clearLockScreenSyncRetry();
+      return;
+    }
+
+    if (
+      (this._lockScreenSyncRetryAttempts ?? 0) >= LOCK_SCREEN_SYNC_MAX_RETRIES
+    ) {
+      this._debugLockScreen("Reached max lock-screen sync retries", {
+        reason,
+        attempts: this._lockScreenSyncRetryAttempts,
+      });
+      return;
+    }
+
+    if (this._lockScreenSyncRetrySourceId) {
+      return;
+    }
+
+    this._lockScreenSyncRetryAttempts =
+      (this._lockScreenSyncRetryAttempts ?? 0) + 1;
+    const attempt = this._lockScreenSyncRetryAttempts;
+    this._debugLockScreen("Scheduling lock-screen sync retry", {
+      reason,
+      attempt,
+      delayMs: LOCK_SCREEN_SYNC_RETRY_DELAY_MS,
+    });
+
+    this._lockScreenSyncRetrySourceId = GLib.timeout_add(
+      GLib.PRIORITY_DEFAULT,
+      LOCK_SCREEN_SYNC_RETRY_DELAY_MS,
+      () => {
+        this._lockScreenSyncRetrySourceId = null;
+        this._debugLockScreen("Running lock-screen sync retry", {
+          attempt,
+          hasDialog: Boolean(this._getLockScreenDialog()),
+          active: Main.screenShield?.active ?? null,
+          locked: Main.screenShield?.locked ?? null,
+        });
+        this._setLockScreenMessage(this._getCurrentIndicatorText());
+        return GLib.SOURCE_REMOVE;
+      }
+    );
+  }
+
+  _getActorDebugState(actor) {
+    if (!actor) {
+      return { exists: false };
+    }
+
+    let parent = null;
+    try {
+      parent = actor.get_parent?.() ?? null;
+    } catch {
+      parent = null;
+    }
+
+    let onStage = false;
+    try {
+      onStage = Boolean(actor.get_stage?.());
+    } catch {
+      onStage = false;
+    }
+
+    return {
+      exists: true,
+      visible: actor.visible ?? null,
+      mapped: actor.mapped ?? null,
+      opacity: actor.opacity ?? null,
+      x: actor.x ?? null,
+      y: actor.y ?? null,
+      width: actor.width ?? null,
+      height: actor.height ?? null,
+      onStage,
+      parentName: parent?.name ?? null,
+      parentVisible: parent?.visible ?? null,
+      parentMapped: parent?.mapped ?? null,
+      parentOpacity: parent?.opacity ?? null,
+    };
+  }
+
   _sanitizeDebugDetails(details, parentKey = "") {
     if (details === null || details === undefined) {
       return details;
@@ -620,25 +808,23 @@ export default class NextUpExtension extends Extension {
   }
 
   _debugLockScreen(message, details = null) {
-    if (!this._debugLogsEnabled) {
+    if (!this._logger) {
       return;
     }
-
-    const prefix = `[${this.uuid}] lock-screen`;
 
     if (details === null || details === undefined) {
-      log(`${prefix}: ${message}`);
+      this._logger.info(`lock-screen: ${message}`);
       return;
     }
 
-    let detailsText = "";
+    let sanitizedDetails = details;
     try {
-      detailsText = JSON.stringify(this._sanitizeDebugDetails(details));
+      sanitizedDetails = this._sanitizeDebugDetails(details);
     } catch {
-      detailsText = String(details);
+      sanitizedDetails = details;
     }
 
-    log(`${prefix}: ${message} ${detailsText}`);
+    this._logger.info(`lock-screen: ${message}`, sanitizedDetails);
   }
 
   _hasDialogActor(dialog, actorPropertyName) {
@@ -653,21 +839,38 @@ export default class NextUpExtension extends Extension {
     }
   }
 
-  _setLabelText(label, text, labelName = "label", labelPropertyName = null) {
+  _setLabelText(
+    label,
+    text,
+    labelName = "label",
+    labelPropertyName = null,
+    options = {}
+  ) {
+    const suppressMissingActorLog = options.suppressMissingActorLog ?? false;
+    const markup = options.markup ?? null;
     if (!label) {
-      this._debugLockScreen(`Skipping update for ${labelName}: actor missing`);
+      if (!suppressMissingActorLog) {
+        this._debugLockScreen(`Skipping update for ${labelName}: actor missing`);
+      }
       return;
     }
 
     try {
-      label.text = text;
+      if (typeof markup === "string" && markup.length > 0) {
+        label.clutter_text.set_markup(markup);
+      } else {
+        label.text = text;
+      }
       label.visible = text.length > 0;
       this._debugLockScreen(`Updated ${labelName}`, {
         visible: label.visible,
+        textLength: text.length,
+        actorState: this._getActorDebugState(label),
       });
     } catch (error) {
       this._debugLockScreen(`Failed to update ${labelName}`, {
         error: String(error),
+        actorState: this._getActorDebugState(label),
       });
       if (labelPropertyName) {
         this[labelPropertyName] = null;
@@ -675,15 +878,63 @@ export default class NextUpExtension extends Extension {
     }
   }
 
+  _toPangoColor(colorValue) {
+    if (typeof colorValue !== "string") {
+      return null;
+    }
+
+    const trimmedColor = colorValue.trim();
+    if (trimmedColor.length === 0) {
+      return null;
+    }
+
+    try {
+      const [parsed, color] = Clutter.Color.from_string(trimmedColor);
+      if (!parsed || !color) {
+        return null;
+      }
+
+      const red = color.red.toString(16).padStart(2, "0");
+      const green = color.green.toString(16).padStart(2, "0");
+      const blue = color.blue.toString(16).padStart(2, "0");
+      return `#${red}${green}${blue}`;
+    } catch {
+      return null;
+    }
+  }
+
+  _buildDesktopMessageMarkup(text, highlightColor) {
+    if (typeof text !== "string" || text.length === 0) {
+      return null;
+    }
+
+    const pangoColor = this._toPangoColor(highlightColor);
+    if (!pangoColor) {
+      return null;
+    }
+
+    const lines = text.split("\n");
+    if (lines.length === 0 || lines[0].length === 0) {
+      return null;
+    }
+
+    const escapedLines = lines.map((line) => GLib.markup_escape_text(line, -1));
+    escapedLines[0] = `<span foreground="${pangoColor}">${escapedLines[0]}</span>`;
+    return escapedLines.join("\n");
+  }
+
   _syncLockScreenMessageActor() {
     const showOnLockScreen =
       this._settings?.get_boolean("show-on-lock-screen") ?? false;
-    const dialog = this._getLockScreenDialog();
+    const shield = Main.screenShield ?? null;
+    const lockScreenActive = Boolean(shield?.active || shield?.locked);
+    let dialog = this._getLockScreenDialog();
     this._debugLockScreen("Sync lock-screen actors", {
       showOnLockScreen,
+      lockScreenActive,
       hasDialog: Boolean(dialog),
-      active: Main.screenShield?.active ?? null,
-      locked: Main.screenShield?.locked ?? null,
+      active: shield?.active ?? null,
+      locked: shield?.locked ?? null,
     });
 
     if (!showOnLockScreen) {
@@ -694,13 +945,66 @@ export default class NextUpExtension extends Extension {
       return;
     }
 
+    if (!lockScreenActive) {
+      this._clearLockScreenMessageActors({
+        removeFromParent: true,
+        reason: "screen-shield-inactive",
+      });
+      return;
+    }
+
     if (!dialog) {
+      const lockDialogChildrenCount =
+        shield?._lockDialogGroup?.get_children?.().length ?? 0;
       this._debugLockScreen("No lock-screen dialog available");
+      this._debugLockScreen("Lock-screen dialog diagnostics", {
+        hasEnsureUnlockDialog: typeof shield?._ensureUnlockDialog === "function",
+        active: shield?.active ?? null,
+        locked: shield?.locked ?? null,
+        hasUnlockDialogCtor: Boolean(Main.sessionMode?.unlockDialog),
+        hasLockDialogGroup: Boolean(shield?._lockDialogGroup),
+        lockDialogChildrenCount,
+        hasDialog: Boolean(dialog),
+      });
+
+      const lockDialogGroup = shield?._lockDialogGroup ?? null;
+      if (lockDialogGroup && lockScreenActive) {
+        if (!this._lockScreenFallbackLabel) {
+          this._lockScreenFallbackLabel = this._createLockScreenMessageLabel();
+          this._lockScreenFallbackLabel.x_align = Clutter.ActorAlign.CENTER;
+          this._lockScreenFallbackLabel.y_align = Clutter.ActorAlign.START;
+          this._lockScreenFallbackLabel.x_expand = true;
+          lockDialogGroup.add_child(this._lockScreenFallbackLabel);
+          this._debugLockScreen("Added lock-screen fallback label to lockDialogGroup");
+        }
+
+        this._removeActor(this._lockScreenMessageLabel, "lock-screen clock label");
+        this._removeActor(this._unlockPromptMessageLabel, "unlock prompt label");
+        this._lockScreenMessageLabel = null;
+        this._unlockPromptMessageLabel = null;
+        this._lockScreenDialog = null;
+
+        this._applyLockScreenLabelStyle(this._lockScreenFallbackLabel);
+        this._setLabelText(
+          this._lockScreenFallbackLabel,
+          this._getCurrentIndicatorText(),
+          "lock-screen fallback label",
+          "_lockScreenFallbackLabel"
+        );
+        return;
+      }
+
       this._clearLockScreenMessageActors({
         removeFromParent: false,
         reason: "dialog-missing",
       });
       return;
+    }
+
+    if (this._lockScreenFallbackLabel) {
+      this._debugLockScreen("Removing lock-screen fallback label (dialog available)");
+      this._removeActor(this._lockScreenFallbackLabel, "lock-screen fallback label");
+      this._lockScreenFallbackLabel = null;
     }
 
     if (this._lockScreenDialog !== dialog) {
@@ -720,12 +1024,6 @@ export default class NextUpExtension extends Extension {
         this._lockScreenMessageLabel = this._createLockScreenMessageLabel();
         dialog._clock.add_child(this._lockScreenMessageLabel);
         this._debugLockScreen("Added lock-screen clock label");
-      }
-
-      if (!this._unlockPromptMessageLabel && dialog._promptBox) {
-        this._unlockPromptMessageLabel = this._createLockScreenMessageLabel();
-        dialog._promptBox.add_child(this._unlockPromptMessageLabel);
-        this._debugLockScreen("Added unlock prompt label");
       }
     } catch (error) {
       this._debugLockScreen("Failed to create/attach lock-screen label", {
@@ -753,15 +1051,42 @@ export default class NextUpExtension extends Extension {
     this._debugLockScreen("Lock-screen dialog sync result", {
       hasClockLabel: Boolean(this._lockScreenMessageLabel),
       hasPromptLabel: Boolean(this._unlockPromptMessageLabel),
+      hasFallbackLabel: Boolean(this._lockScreenFallbackLabel),
+      hasOverlayLabel: Boolean(this._lockScreenOverlayLabel),
     });
   }
 
   _setLockScreenMessage(text) {
-    this._debugLockScreen("Applying lock-screen message", { hasText: text.length > 0 });
+    this._debugLockScreen("Applying lock-screen message", {
+      hasText: text.length > 0,
+      textLength: text.length,
+      hasClockLabel: Boolean(this._lockScreenMessageLabel),
+      hasPromptLabel: Boolean(this._unlockPromptMessageLabel),
+      hasFallbackLabel: Boolean(this._lockScreenFallbackLabel),
+      hasOverlayLabel: Boolean(this._lockScreenOverlayLabel),
+    });
     this._syncLockScreenMessageActor();
 
     if (!this._settings.get_boolean("show-on-lock-screen")) {
       this._debugLockScreen("Lock-screen setting disabled; skipping text update");
+      return;
+    }
+
+    if (
+      !this._lockScreenMessageLabel &&
+      !this._unlockPromptMessageLabel &&
+      !this._lockScreenFallbackLabel
+    ) {
+      const overlayShown = this._updateLockScreenOverlayLabel(text);
+      this._debugLockScreen("Lock-screen labels unavailable after sync; skipping text update", {
+        active: Main.screenShield?.active ?? null,
+        locked: Main.screenShield?.locked ?? null,
+        hasDialog: Boolean(this._getLockScreenDialog()),
+        overlayShown,
+      });
+      if (!overlayShown) {
+        this._scheduleLockScreenSyncRetry("labels-unavailable");
+      }
       return;
     }
 
@@ -777,6 +1102,52 @@ export default class NextUpExtension extends Extension {
       "unlock prompt label",
       "_unlockPromptMessageLabel"
     );
+    this._setLabelText(
+      this._lockScreenFallbackLabel,
+      text,
+      "lock-screen fallback label",
+      "_lockScreenFallbackLabel",
+      { suppressMissingActorLog: true }
+    );
+    this._debugLockScreen("Lock-screen text update complete", {
+      textLength: text.length,
+      hasClockLabel: Boolean(this._lockScreenMessageLabel),
+      hasPromptLabel: Boolean(this._unlockPromptMessageLabel),
+      hasFallbackLabel: Boolean(this._lockScreenFallbackLabel),
+    });
+
+    const lockScreenClockVisible = this._isActorEffectivelyVisible(
+      this._lockScreenMessageLabel
+    );
+    const unlockPromptVisible = this._isActorEffectivelyVisible(
+      this._unlockPromptMessageLabel
+    );
+    const fallbackVisible = this._isActorEffectivelyVisible(
+      this._lockScreenFallbackLabel
+    );
+    const overlayShown = this._updateLockScreenOverlayLabel(text);
+    const overlayVisible = this._isActorEffectivelyVisible(
+      this._lockScreenOverlayLabel
+    );
+
+    this._debugLockScreen("Lock-screen visibility check", {
+      lockScreenClockVisible,
+      unlockPromptVisible,
+      fallbackVisible,
+      overlayShown,
+      overlayVisible,
+    });
+
+    if (
+      !lockScreenClockVisible &&
+      !unlockPromptVisible &&
+      !fallbackVisible &&
+      !overlayVisible
+    ) {
+      this._scheduleLockScreenSyncRetry("actors-not-mapped");
+    } else {
+      this._clearLockScreenSyncRetry();
+    }
   }
 
   _repositionDesktopMessageLabel() {
@@ -864,18 +1235,21 @@ export default class NextUpExtension extends Extension {
     this._repositionDesktopMessageLabel();
   }
 
-  _setDesktopMessage(text) {
+  _setDesktopMessage(text, highlightColor = null) {
     this._syncDesktopMessageActor();
 
     if (!this._settings.get_boolean("show-on-desktop")) {
       return;
     }
 
+    const desktopMarkup = this._buildDesktopMessageMarkup(text, highlightColor);
+
     this._setLabelText(
       this._desktopMessageLabel,
       text,
       "desktop message label",
-      "_desktopMessageLabel"
+      "_desktopMessageLabel",
+      { markup: desktopMarkup }
     );
     this._repositionDesktopMessageLabel();
   }
@@ -903,18 +1277,51 @@ export default class NextUpExtension extends Extension {
 
   refreshIndicator() {
     const lookaheadMode = this._settings.get_int("event-lookahead");
+    const use24HourFormat = this._settings.get_boolean("use-24-hour-format");
     const events = DateHelperFunctions.getEventsForLookahead(
       this._indicator._calendarSource,
       lookaheadMode
     );
     const eventStatus = DateHelperFunctions.getNextEventsToDisplay(events);
+
+    if (
+      !this._calendarInitialSyncComplete &&
+      (events.length > 0 ||
+        eventStatus.currentEvent !== null ||
+        eventStatus.nextEvent !== null)
+    ) {
+      this._markCalendarInitialSyncComplete("events-available", {
+        eventsCount: events.length,
+      });
+    }
+
+    if (!this._calendarInitialSyncComplete) {
+      this._currentIndicatorText = "";
+      this._currentDesktopText = "";
+      this._indicator.showCalendarIcon();
+      this._indicator.setText("");
+      this._indicator.setTextColor(null);
+      this._setLockScreenMessage("");
+      this._setDesktopMessage("", null);
+      this._debugLockScreen(
+        "Calendar still initializing; suppressing early status text",
+        {
+          eventsCount: events.length,
+          timedOut: this._calendarInitialSyncTimedOut,
+        }
+      );
+      return;
+    }
+
     const fullIndicatorText = DateHelperFunctions.eventStatusToIndicatorText(
       eventStatus,
-      lookaheadMode
+      lookaheadMode,
+      use24HourFormat
     );
     const lockScreenText = DateHelperFunctions.eventStatusToLockScreenText(
       eventStatus,
-      lookaheadMode
+      lookaheadMode,
+      use24HourFormat
     );
     const showOnlyTimer = this._settings.get_boolean("show-only-timer");
     const topBarText = showOnlyTimer
@@ -928,7 +1335,8 @@ export default class NextUpExtension extends Extension {
     const desktopText = DateHelperFunctions.eventsToDesktopText(
       events,
       desktopEventsToShow,
-      lookaheadMode
+      lookaheadMode,
+      use24HourFormat
     );
     this._currentIndicatorText = lockScreenText;
     this._currentDesktopText = desktopText;
@@ -936,6 +1344,7 @@ export default class NextUpExtension extends Extension {
       hasCurrentEvent: eventStatus.currentEvent !== null,
       hasNextEvent: eventStatus.nextEvent !== null,
       showOnlyTimer,
+      use24HourFormat,
       indicatorTimingState,
       indicatorStatusColor,
       desktopEventsToShow,
@@ -952,7 +1361,11 @@ export default class NextUpExtension extends Extension {
     this._indicator.setText(topBarText);
     this._indicator.setTextColor(indicatorStatusColor);
     this._setLockScreenMessage(lockScreenText);
-    this._setDesktopMessage(desktopText);
+    const desktopHighlightColor =
+      indicatorTimingState === INDICATOR_TIMING_STATE.NONE
+        ? null
+        : indicatorStatusColor;
+    this._setDesktopMessage(desktopText, desktopHighlightColor);
   }
 
   disable() {
@@ -962,45 +1375,18 @@ export default class NextUpExtension extends Extension {
       parent.remove_child(this._indicator.container);
     }
 
-    this._settings.disconnect(this._whichPanelChangedSignal);
-    this._settings.disconnect(this._eventLookaheadChangedSignal);
-    this._settings.disconnect(this._showOnlyTimerChangedSignal);
-    this._settings.disconnect(this._refreshIntervalValueChangedSignal);
-    this._settings.disconnect(this._refreshIntervalUnitChangedSignal);
-    this._settings.disconnect(this._comingUpColorChangedSignal);
-    this._settings.disconnect(this._comingUpThresholdValueChangedSignal);
-    this._settings.disconnect(this._comingUpThresholdUnitChangedSignal);
-    this._settings.disconnect(this._startingSoonColorChangedSignal);
-    this._settings.disconnect(this._startingSoonThresholdValueChangedSignal);
-    this._settings.disconnect(this._startingSoonThresholdUnitChangedSignal);
-    this._settings.disconnect(this._showOnLockScreenChangedSignal);
-    this._settings.disconnect(this._showOnDesktopChangedSignal);
-    this._settings.disconnect(this._desktopEventsToShowChangedSignal);
-    this._settings.disconnect(this._desktopHorizontalAlignChangedSignal);
-    this._settings.disconnect(this._desktopVerticalAlignChangedSignal);
-    this._settings.disconnect(this._lockScreenFontSizeChangedSignal);
-    this._settings.disconnect(this._desktopFontSizeChangedSignal);
-    this._indicator._calendarSource.disconnect(this._calendarSourceChangedSignal);
-
-    if (this._lockScreenActiveChangedSignal) {
-      Main.screenShield.disconnect(this._lockScreenActiveChangedSignal);
-      this._lockScreenActiveChangedSignal = null;
-    }
-
-    if (this._lockScreenLockedChangedSignal) {
-      Main.screenShield.disconnect(this._lockScreenLockedChangedSignal);
-      this._lockScreenLockedChangedSignal = null;
-    }
-
-    if (this._monitorsChangedSignal) {
-      Main.layoutManager.disconnect(this._monitorsChangedSignal);
-      this._monitorsChangedSignal = null;
-    }
+    disconnectTopPanelActions(this._topPanelActions);
+    disconnectLockScreenActions(this._lockScreenActions);
+    disconnectDesktopBackgroundActions(this._desktopBackgroundActions);
+    this._topPanelActions = null;
+    this._lockScreenActions = null;
+    this._desktopBackgroundActions = null;
 
     this._clearLockScreenMessageActors({
       removeFromParent: true,
       reason: "disable",
     });
+    this._clearLockScreenOverlayLabel();
     this._clearDesktopMessageActor({
       removeFromParent: true,
       reason: "disable",
@@ -1008,7 +1394,12 @@ export default class NextUpExtension extends Extension {
 
     this._currentIndicatorText = "";
     this._currentDesktopText = "";
+    this._calendarInitialSyncComplete = false;
+    this._calendarInitialSyncTimedOut = false;
+    this._clearCalendarInitialSyncWatchdog();
     this._debugLogsEnabled = false;
+    this._clearLockScreenSyncRetry();
+    this._logger.setDebugEnabled(false);
     this._settings = null;
 
     this._indicator.destroy();
@@ -1020,5 +1411,7 @@ export default class NextUpExtension extends Extension {
       GLib.Source.remove(this.delaySourceId);
       this.delaySourceId = null;
     }
+
+    this._logger = null;
   }
 }

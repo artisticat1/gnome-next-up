@@ -127,9 +127,14 @@ export function getNextEventsToDisplay(events) {
   };
 }
 
-function eventStatusToText(eventStatus, lookaheadMode, getDiffText) {
+function eventStatusToText(
+  eventStatus,
+  lookaheadMode,
+  getDiffText,
+  use24HourFormat = true
+) {
   function displayNextEvent(event) {
-    const timeText = getTimeOfEventAsText(event.date);
+    const timeText = getTimeOfEventAsText(event.date, use24HourFormat);
     const diffText = getDiffText(event.date);
 
     const summary = trimLongEventName(event.summary);
@@ -139,7 +144,7 @@ function eventStatusToText(eventStatus, lookaheadMode, getDiffText) {
 
   function displayCurrentEventAndNextEvent(currentEvent, nextEvent) {
     const endsInText = getDiffText(currentEvent.end);
-    const timeText = getTimeOfEventAsText(nextEvent.date);
+    const timeText = getTimeOfEventAsText(nextEvent.date, use24HourFormat);
 
     const summary = trimLongEventName(nextEvent.summary);
 
@@ -170,12 +175,30 @@ function eventStatusToText(eventStatus, lookaheadMode, getDiffText) {
   }
 }
 
-export function eventStatusToIndicatorText(eventStatus, lookaheadMode = 0) {
-  return eventStatusToText(eventStatus, lookaheadMode, getTimeToEventAsText);
+export function eventStatusToIndicatorText(
+  eventStatus,
+  lookaheadMode = 0,
+  use24HourFormat = true
+) {
+  return eventStatusToText(
+    eventStatus,
+    lookaheadMode,
+    getTimeToEventAsText,
+    use24HourFormat
+  );
 }
 
-export function eventStatusToLockScreenText(eventStatus, lookaheadMode = 0) {
-  return eventStatusToText(eventStatus, lookaheadMode, getTimeToEventAsLongText);
+export function eventStatusToLockScreenText(
+  eventStatus,
+  lookaheadMode = 0,
+  use24HourFormat = true
+) {
+  return eventStatusToText(
+    eventStatus,
+    lookaheadMode,
+    getTimeToEventAsLongText,
+    use24HourFormat
+  );
 }
 
 export function eventStatusToTimerText(eventStatus, lookaheadMode = 0) {
@@ -194,7 +217,8 @@ export function eventStatusToTimerText(eventStatus, lookaheadMode = 0) {
 export function eventsToDesktopText(
   events,
   maxEventsToShow = 1,
-  lookaheadMode = 0
+  lookaheadMode = 0,
+  use24HourFormat = true
 ) {
   const now = new Date();
   const clampedMaxEventsToShow = Math.max(1, Math.min(6, maxEventsToShow));
@@ -208,7 +232,11 @@ export function eventsToDesktopText(
 
   return upcomingEvents
     .map((event) => {
-      const timeText = getTimeOfEventAsText(event.date);
+      const timeText = getTimeOfEventAsText(
+        event.date,
+        use24HourFormat,
+        true
+      );
       const diffText = getTimeToEventAsLongText(event.date);
       const summary = trimLongEventName(event.summary);
       return `${timeText} - ${summary} (in ${diffText})`;
@@ -216,11 +244,26 @@ export function eventsToDesktopText(
     .join("\n");
 }
 
-function getTimeOfEventAsText(eventDate) {
-  const hrs = eventDate.getHours().toString().padStart(2, "0");
+function getTimeOfEventAsText(
+  eventDate,
+  use24HourFormat = true,
+  pad12HourValue = false
+) {
+  const hours = eventDate.getHours();
   const mins = eventDate.getMinutes().toString().padStart(2, "0");
 
-  return `${hrs}:${mins}`;
+  if (use24HourFormat) {
+    const hrs = hours.toString().padStart(2, "0");
+    return `${hrs}:${mins}`;
+  }
+
+  const period = hours >= 12 ? "PM" : "AM";
+  const twelveHourValue = hours % 12 || 12;
+  const hoursText = pad12HourValue
+    ? twelveHourValue.toString().padStart(2, "0")
+    : twelveHourValue.toString();
+
+  return `${hoursText}:${mins} ${period}`;
 }
 
 function getTimeToEventParts(eventDate) {
