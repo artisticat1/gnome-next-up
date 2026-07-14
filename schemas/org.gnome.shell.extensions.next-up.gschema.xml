@@ -5,5 +5,74 @@
     <key name="which-panel" type="i">
       <default>1</default>
     </key>
+    <key name="event-lookahead" type="i">
+      <range min="0" max="2"/>
+      <default>0</default>
+    </key>
+    <key name="show-only-timer" type="b">
+      <default>false</default>
+    </key>
+    <key name="use-24-hour-format" type="b">
+      <default>true</default>
+    </key>
+    <key name="refresh-interval-value" type="i">
+      <range min="1" max="60"/>
+      <default>5</default>
+    </key>
+    <key name="refresh-interval-unit" type="i">
+      <range min="0" max="1"/>
+      <default>0</default>
+    </key>
+    <key name="coming-up-color" type="s">
+      <default>'yellow'</default>
+    </key>
+    <key name="coming-up-threshold-value" type="i">
+      <range min="1" max="9999"/>
+      <default>2</default>
+    </key>
+    <key name="coming-up-threshold-unit" type="i">
+      <range min="0" max="1"/>
+      <default>1</default>
+    </key>
+    <key name="starting-soon-color" type="s">
+      <default>'red'</default>
+    </key>
+    <key name="starting-soon-threshold-value" type="i">
+      <range min="1" max="9999"/>
+      <default>30</default>
+    </key>
+    <key name="starting-soon-threshold-unit" type="i">
+      <range min="0" max="1"/>
+      <default>0</default>
+    </key>
+    <key name="show-on-lock-screen" type="b">
+      <default>false</default>
+    </key>
+    <key name="lock-screen-font-size" type="i">
+      <range min="8" max="72"/>
+      <default>14</default>
+    </key>
+    <key name="show-on-desktop" type="b">
+      <default>false</default>
+    </key>
+    <key name="desktop-font-size" type="i">
+      <range min="8" max="72"/>
+      <default>14</default>
+    </key>
+    <key name="desktop-events-to-show" type="i">
+      <range min="1" max="6"/>
+      <default>1</default>
+    </key>
+    <key name="desktop-horizontal-align" type="i">
+      <range min="0" max="1"/>
+      <default>0</default>
+    </key>
+    <key name="desktop-vertical-align" type="i">
+      <range min="0" max="1"/>
+      <default>0</default>
+    </key>
+    <key name="debug-logs-enabled" type="b">
+      <default>false</default>
+    </key>
   </schema>
 </schemalist>

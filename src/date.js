@@ -1,4 +1,13 @@
 const MAX_EVENT_SUMMARY_LENGTH = 35;
+export const EVENT_LOOKAHEAD = {
+  TODAY: 0,
+  WEEK: 1,
+  MONTH: 2,
+};
+
+function pluralize(value, singular, plural) {
+  return `${value} ${value === 1 ? singular : plural}`;
+}
 
 function trimLongEventName(summary) {
   if (summary.length > MAX_EVENT_SUMMARY_LENGTH) {
@@ -17,24 +26,63 @@ function notFullDayEvent(event) {
   );
 }
 
-export function getTodaysEvents(calendarSource) {
-  const src = calendarSource;
-  src._loadEvents(true);
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Get event from today at midnight
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-
-  const todaysEvents = src.getEvents(today, tomorrow).filter(notFullDayEvent);
-
-  return todaysEvents;
+function getLookaheadDays(lookaheadMode) {
+  switch (lookaheadMode) {
+    case EVENT_LOOKAHEAD.WEEK:
+      return 7;
+    case EVENT_LOOKAHEAD.MONTH:
+      return 30;
+    case EVENT_LOOKAHEAD.TODAY:
+    default:
+      return 1;
+  }
 }
 
-export function getNextEventsToDisplay(todaysEvents) {
+function getNoEventsText(lookaheadMode) {
+  switch (lookaheadMode) {
+    case EVENT_LOOKAHEAD.WEEK:
+      return "No more events this week!";
+    case EVENT_LOOKAHEAD.MONTH:
+      return "No upcoming events this month!";
+    case EVENT_LOOKAHEAD.TODAY:
+    default:
+      return "Done for today!";
+  }
+}
+
+export function getEventsForLookahead(calendarSource, lookaheadMode = 0) {
+  const src = calendarSource;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const days = getLookaheadDays(lookaheadMode);
+  const rangeEnd = new Date(today);
+  rangeEnd.setDate(today.getDate() + days);
+
+  // Ask GNOME Shell CalendarServer to populate/update this range before reading.
+  src.requestRange(today, rangeEnd);
+
+  const events = src.getEvents(today, rangeEnd).filter(notFullDayEvent);
+  events.sort((a, b) => {
+    const startDiff = a.date.valueOf() - b.date.valueOf();
+    if (startDiff !== 0) {
+      return startDiff;
+    }
+
+    return a.end.valueOf() - b.end.valueOf();
+  });
+
+  return events;
+}
+
+export function getTodaysEvents(calendarSource) {
+  return getEventsForLookahead(calendarSource, EVENT_LOOKAHEAD.TODAY);
+}
+
+export function getNextEventsToDisplay(events) {
   const now = new Date();
-  const N = todaysEvents.length;
+  const N = events.length;
 
   let currentEvent = null; // The calendar event the user is currently in
   let nextEvent = null; // The next calendar event coming up
@@ -43,7 +91,7 @@ export function getNextEventsToDisplay(todaysEvents) {
   for (let i = 0; i < N; i++) {
     if (done) break;
 
-    const event = todaysEvents[i];
+    const event = events[i];
     const eventStart = event.date;
     const eventEnd = event.end;
 
@@ -58,7 +106,7 @@ export function getNextEventsToDisplay(todaysEvents) {
         let someNextEvent;
 
         for (let j = i + 1; j < N; j++) {
-          someNextEvent = todaysEvents[j];
+          someNextEvent = events[j];
 
           // Check whether the next event overlaps the current event
           // or whether they start at the same time
@@ -79,10 +127,15 @@ export function getNextEventsToDisplay(todaysEvents) {
   };
 }
 
-export function eventStatusToIndicatorText(eventStatus) {
+function eventStatusToText(
+  eventStatus,
+  lookaheadMode,
+  getDiffText,
+  use24HourFormat = true
+) {
   function displayNextEvent(event) {
-    const timeText = getTimeOfEventAsText(event.date);
-    const diffText = getTimeToEventAsText(event.date);
+    const timeText = getTimeOfEventAsText(event.date, use24HourFormat);
+    const diffText = getDiffText(event.date);
 
     const summary = trimLongEventName(event.summary);
 
@@ -90,8 +143,8 @@ export function eventStatusToIndicatorText(eventStatus) {
   }
 
   function displayCurrentEventAndNextEvent(currentEvent, nextEvent) {
-    const endsInText = getTimeToEventAsText(currentEvent.end);
-    const timeText = getTimeOfEventAsText(nextEvent.date);
+    const endsInText = getDiffText(currentEvent.end);
+    const timeText = getTimeOfEventAsText(nextEvent.date, use24HourFormat);
 
     const summary = trimLongEventName(nextEvent.summary);
 
@@ -99,13 +152,10 @@ export function eventStatusToIndicatorText(eventStatus) {
   }
 
   function displayCurrentEvent(event) {
-    const endsInText = getTimeToEventAsText(event.end);
+    const endsInText = getDiffText(event.end);
+    const summary = trimLongEventName(event.summary);
 
-    return `Ends in ${endsInText}: ${event.summary}`;
-  }
-
-  function displayNoEvents() {
-    return "Done for today!";
+    return `Ends in ${endsInText}: ${summary}`;
   }
 
   const { currentEvent, nextEvent } = eventStatus;
@@ -120,28 +170,138 @@ export function eventStatusToIndicatorText(eventStatus) {
     if (nextEvent != null) {
       return displayNextEvent(nextEvent);
     } else {
-      return displayNoEvents();
+      return getNoEventsText(lookaheadMode);
     }
   }
 }
 
-function getTimeOfEventAsText(eventDate) {
-  const hrs = eventDate.getHours();
-  let mins = eventDate.getMinutes().toString();
+export function eventStatusToIndicatorText(
+  eventStatus,
+  lookaheadMode = 0,
+  use24HourFormat = true
+) {
+  return eventStatusToText(
+    eventStatus,
+    lookaheadMode,
+    getTimeToEventAsText,
+    use24HourFormat
+  );
+}
 
-  mins = mins.padEnd(2, "0"); // Show e.g. 11am as 11:00 instead of 11:0
+export function eventStatusToLockScreenText(
+  eventStatus,
+  lookaheadMode = 0,
+  use24HourFormat = true
+) {
+  return eventStatusToText(
+    eventStatus,
+    lookaheadMode,
+    getTimeToEventAsLongText,
+    use24HourFormat
+  );
+}
 
-  const time = `${hrs}:${mins}`;
-  return time;
+export function eventStatusToTimerText(eventStatus, lookaheadMode = 0) {
+  const { currentEvent, nextEvent } = eventStatus;
+
+  if (currentEvent != null) {
+    return `Ends in ${getTimeToEventAsText(currentEvent.end)}`;
+  }
+  if (nextEvent != null) {
+    return `In ${getTimeToEventAsText(nextEvent.date)}`;
+  }
+
+  return getNoEventsText(lookaheadMode);
+}
+
+export function eventsToDesktopText(
+  events,
+  maxEventsToShow = 1,
+  lookaheadMode = 0,
+  use24HourFormat = true
+) {
+  const now = new Date();
+  const clampedMaxEventsToShow = Math.max(1, Math.min(6, maxEventsToShow));
+  const upcomingEvents = events
+    .filter((event) => event.date > now)
+    .slice(0, clampedMaxEventsToShow);
+
+  if (upcomingEvents.length === 0) {
+    return getNoEventsText(lookaheadMode);
+  }
+
+  return upcomingEvents
+    .map((event) => {
+      const timeText = getTimeOfEventAsText(
+        event.date,
+        use24HourFormat,
+        true
+      );
+      const diffText = getTimeToEventAsLongText(event.date);
+      const summary = trimLongEventName(event.summary);
+      return `${timeText} - ${summary} (in ${diffText})`;
+    })
+    .join("\n");
+}
+
+function getTimeOfEventAsText(
+  eventDate,
+  use24HourFormat = true,
+  pad12HourValue = false
+) {
+  const hours = eventDate.getHours();
+  const mins = eventDate.getMinutes().toString().padStart(2, "0");
+
+  if (use24HourFormat) {
+    const hrs = hours.toString().padStart(2, "0");
+    return `${hrs}:${mins}`;
+  }
+
+  const period = hours >= 12 ? "PM" : "AM";
+  const twelveHourValue = hours % 12 || 12;
+  const hoursText = pad12HourValue
+    ? twelveHourValue.toString().padStart(2, "0")
+    : twelveHourValue.toString();
+
+  return `${hoursText}:${mins} ${period}`;
+}
+
+function getTimeToEventParts(eventDate) {
+  const now = new Date();
+  const diff = Math.abs(eventDate - now);
+  const totalMinutes = Math.max(0, Math.ceil(diff / (1000 * 60)));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const remainingMinutesAfterDays = totalMinutes % (24 * 60);
+  const hours = Math.floor(remainingMinutesAfterDays / 60);
+  const minutes = remainingMinutesAfterDays % 60;
+
+  return { days, hours, minutes };
 }
 
 function getTimeToEventAsText(eventDate) {
-  const now = new Date();
-  const diff = Math.abs(eventDate - now);
-  const diffInMins = Math.ceil(diff / (1000 * 60));
+  const { days, hours, minutes } = getTimeToEventParts(eventDate);
 
-  const hrDiff = Math.floor(diffInMins / 60);
-  const minDiff = diffInMins % 60;
+  if (days > 0) {
+    return pluralize(days, "day", "days");
+  }
 
-  return hrDiff > 0 ? `${hrDiff} hr ${minDiff} min` : `${minDiff} min`;
+  if (hours > 0) {
+    return `${hours} hr ${minutes} min`;
+  }
+
+  return `${minutes} min`;
+}
+
+function getTimeToEventAsLongText(eventDate) {
+  const { days, hours, minutes } = getTimeToEventParts(eventDate);
+
+  if (days > 0) {
+    return `${pluralize(days, "day", "days")}, ${pluralize(hours, "hour", "hours")}, ${pluralize(minutes, "minute", "minutes")}`;
+  }
+
+  if (hours > 0) {
+    return `${pluralize(hours, "hour", "hours")}, ${pluralize(minutes, "minute", "minutes")}`;
+  }
+
+  return pluralize(minutes, "minute", "minutes");
 }
