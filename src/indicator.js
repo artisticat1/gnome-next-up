@@ -24,13 +24,11 @@ export default class Indicator extends PanelMenu.Button {
 
   _loadGUI() {
     this._menuLayout = new St.BoxLayout({
-      vertical: false,
       clip_to_allocation: true,
       x_align: Clutter.ActorAlign.START,
       y_align: Clutter.ActorAlign.CENTER,
       reactive: true,
       x_expand: true,
-      pack_start: false,
     });
 
     this._alarmIcon = new St.Icon({
